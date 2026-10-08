@@ -2,7 +2,7 @@
 
 Application interactive de calcul de la **Value at Risk (VaR)** et de l'**Expected Shortfall (ES)** d'un portefeuille d'actions, avec **backtesting réglementaire** et **stress tests**.
 
-**Démo en ligne :** [lien vers l'application](https://ton-lien.streamlit.app) <!-- à remplacer après le déploiement -->
+**Démo en ligne :** [lien vers l'application](https://var-engine-haroun-abbes.streamlit.app) 
 
 Projet réalisé dans le cadre du Master 2 Ingénierie des risques économiques et financiers (finance quantitative et actuariat). Il est conçu comme un **modèle challenger** : une réimplémentation indépendante des méthodes utilisées en banque pour mesurer et valider le risque de marché.
 
@@ -58,7 +58,7 @@ Le moteur de calcul (`data.py`, `var_models.py`, `backtesting.py`) est indépend
 ## Installation et lancement
 
 ```bash
-git clone https://github.com/ton-nom-utilisateur/var-engine.git
+git clone https://github.com/atynexpress-afk/var-engine.git
 cd var-engine
 pip install -r requirements.txt
 streamlit run app.py
