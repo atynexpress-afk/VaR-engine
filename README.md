@@ -1,0 +1,82 @@
+# VaR Engine — Mesure du risque de marché
+
+Application interactive de calcul de la **Value at Risk (VaR)** et de l'**Expected Shortfall (ES)** d'un portefeuille d'actions, avec **backtesting réglementaire** et **stress tests**.
+
+**Démo en ligne :** [lien vers l'application](https://ton-lien.streamlit.app) <!-- à remplacer après le déploiement -->
+
+Projet réalisé dans le cadre du Master 2 Ingénierie des risques économiques et financiers (finance quantitative et actuariat). Il est conçu comme un **modèle challenger** : une réimplémentation indépendante des méthodes utilisées en banque pour mesurer et valider le risque de marché.
+
+---
+
+## Fonctionnalités
+
+- **Portefeuille paramétrable** : actions du CAC 40 ou tout ticker Yahoo Finance, poids rééquilibrés automatiquement, période et montant au choix.
+- **Trois méthodes de VaR et d'ES** : historique, paramétrique (loi normale et loi de Student) et Monte Carlo avec corrélations.
+- **Tous les paramètres modifiables** : niveau de confiance, horizon, degrés de liberté, nombre de simulations, graine aléatoire, fenêtre d'estimation.
+- **Backtesting** : VaR glissante hors échantillon, tests de Kupiec et de Christoffersen, feux tricolores de Bâle.
+- **Stress tests** : crises historiques (Lehman 2008, dette européenne 2011, Covid 2020, Ukraine 2022) et chocs hypothétiques définis par l'utilisateur.
+- **Diagnostic des queues de distribution** : histogramme comparé à la loi normale, QQ-plot, skewness et kurtosis.
+- **Graphiques interactifs** et définition de chaque notion accessible depuis l'interface.
+
+## Méthodologie
+
+| Méthode | Principe | Formule |
+|---|---|---|
+| Historique | Quantile empirique des pertes observées | VaR = quantile à α des pertes |
+| Paramétrique normale | Rendements gaussiens | VaR = −μ + σ·z_α |
+| Paramétrique Student | Queues épaisses, variance ajustée à σ | VaR = −μ + σ·√((ν−2)/ν)·t_α,ν |
+| Monte Carlo | Scénarios corrélés par décomposition de Cholesky (Σ = L·Lᵀ) | X = μ + Z·Lᵀ, puis quantile |
+
+- **Expected Shortfall** : perte moyenne au-delà de la VaR, avec formules fermées pour les lois normale et de Student.
+- **Changement d'horizon** : règle de la racine du temps, VaR(h) = VaR(1) × √h.
+- **Rendements** : rendements simples, qui s'agrègent linéairement entre actifs du portefeuille.
+
+### Validation
+
+- **Test de Kupiec** (couverture non conditionnelle) : le nombre d'exceptions est-il compatible avec le niveau de confiance ? Rapport de vraisemblance, χ²(1).
+- **Test de Christoffersen** (couverture conditionnelle) : les exceptions sont-elles indépendantes dans le temps ? χ²(2).
+- **Feux tricolores de Bâle** : zones verte, orange et rouge selon le nombre d'exceptions sur 250 jours.
+- Les formules ont été vérifiées par simulation : sur des données gaussiennes, les trois méthodes retrouvent la VaR théorique à moins de 1 % près.
+
+## Structure du projet
+
+```
+var-engine/
+├── app.py              Interface Streamlit
+├── data.py             Téléchargement des prix, rendements, portefeuille
+├── var_models.py       VaR et ES : historique, paramétrique, Monte Carlo
+├── backtesting.py      Kupiec, Christoffersen, Bâle, stress tests
+├── definitions.py      Définitions affichées dans l'interface
+├── style.py            Apparence : CSS et modèle des graphiques
+├── requirements.txt    Bibliothèques nécessaires
+└── .streamlit/
+    └── config.toml     Thème de l'application
+```
+
+Le moteur de calcul (`data.py`, `var_models.py`, `backtesting.py`) est indépendant de l'interface : chaque module peut être utilisé et testé seul.
+
+## Installation et lancement
+
+```bash
+git clone https://github.com/ton-nom-utilisateur/var-engine.git
+cd var-engine
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+## Limites connues
+
+- La règle de la racine du temps suppose des rendements indépendants et de même loi, ce qui n'est pas vérifié en période de crise (regroupement de la volatilité).
+- Les méthodes historique et paramétrique sur fenêtre fixe réagissent lentement aux changements de régime, ce que le test de Christoffersen met souvent en évidence.
+- Le Monte Carlo repose sur une hypothèse gaussienne multivariée.
+- Les données proviennent de Yahoo Finance et ne sont pas contrôlées comme des données de production.
+
+**Pistes d'amélioration :** volatilité GARCH ou EWMA, VaR historique filtrée, copules pour la dépendance, théorie des valeurs extrêmes.
+
+## Technologies
+
+Python · pandas · NumPy · SciPy · Plotly · Streamlit · yfinance
+
+---
+
+*Projet pédagogique. Ne constitue pas un outil de gestion des risques en production.*

@@ -1,0 +1,18 @@
+# Thème de l'application : couleurs de base utilisées par Streamlit
+# pour les curseurs, boutons, champs de saisie et fonds.
+
+[theme]
+base = "light"
+primaryColor = "#5b6cf0"               # accent bleu-lavande (curseurs, sélections)
+backgroundColor = "#eef0f4"            # fond gris perle de la page
+secondaryBackgroundColor = "#f4f5f9"   # fond des champs de saisie
+textColor = "#1c1c24"                  # texte principal
+borderColor = "#e3e5ec"                # bordures discrètes
+baseRadius = "0.9rem"                  # coins arrondis des widgets
+
+[client]
+toolbarMode = "minimal"                # masque le bouton « Deploy » et le menu développeur
+
+[theme.sidebar]
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f4f5f9"

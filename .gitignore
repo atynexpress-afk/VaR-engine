@@ -1,0 +1,15 @@
+# Fichiers générés automatiquement par Python : inutile de les publier
+__pycache__/
+*.pyc
+
+# Environnements virtuels
+venv/
+.venv/
+
+# Fichiers de configuration de l'éditeur et du système
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Secrets Streamlit (mots de passe, clés) : ne JAMAIS les publier
+.streamlit/secrets.toml
