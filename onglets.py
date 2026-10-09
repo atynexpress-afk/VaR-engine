@@ -17,7 +17,7 @@ from backtesting import (var_glissante, test_kupiec, test_christoffersen, feux_b
                          stress_historiques, stress_hypothetique)
 from definitions import DEFINITIONS as D
 from formats import euros, pct, nombre, p_value, colonne
-from style import (afficher, barre_exceptions, COULEURS, COULEUR_PORTEFEUILLE, COULEUR_PERTES,
+from style import (afficher, barre_exceptions, encadre, COULEURS, COULEUR_PORTEFEUILLE, COULEUR_PERTES,
                    COULEUR_EXCEPTION, ACCENT)
 
 
@@ -169,13 +169,46 @@ def onglet_var_es(resultats_1j, tableau, r_ptf, methode_principale, horizon, mon
 # =============================================================================
 # 3. ONGLET BACKTESTING
 # =============================================================================
+def raison_du_rejet(kupiec, christoffersen):
+    """
+    Traduit le résultat des tests en une phrase compréhensible par un débutant.
+    Renvoie None si le modèle passe les deux tests.
+    """
+    if kupiec["Modèle rejeté (5 %)"]:
+        if kupiec["Exceptions observées"] > kupiec["Exceptions attendues"]:
+            return "sous-estime le risque (la perte dépasse la VaR trop souvent)"
+        return "surestime le risque (la VaR est trop prudente)"
+    if christoffersen["Modèle rejeté (5 %)"]:
+        return ("nombre de dépassements correct, mais ils arrivent en rafale pendant "
+                "les crises (le modèle réagit trop lentement)")
+    return None
+
+
+def conclusion_backtesting(raisons):
+    """Encadré de synthèse au-dessus du tableau des tests."""
+    valides = [nom for nom, raison in raisons.items() if raison is None]
+    rejetes = [f"<b>{nom}</b> : {raison}" for nom, raison in raisons.items() if raison is not None]
+    if len(valides) == 0:
+        titre, ton = "Aucun modèle ne passe les tests de validation", "alerte"
+    elif len(valides) == 1:
+        titre, ton = f"Seul le modèle {valides[0]} passe les tests de validation", "succes"
+    else:
+        titre, ton = f"Modèles validés : {', '.join(valides)}", "succes"
+    encadre(titre, rejetes, ton)
+
+
 def onglet_backtesting(r_ptf, alpha, fenetre, ddl, lam):
-    """Tests de validation de chaque méthode et graphique des exceptions."""
+    """
+    Tests de validation de chaque méthode et graphique des exceptions.
+    Renvoie le tableau des tests (pour l'export), ou None si les données manquent.
+    """
     if len(r_ptf) <= fenetre + 20:
         st.warning("Pas assez de données pour cette fenêtre : élargis la période ou réduis la fenêtre.")
+        return None
     else:
         lignes = {}
         backtests = {}
+        raisons = {}
         for code, nom in [("historique", "Historique"), ("normale", "Paramétrique normale"),
                           ("student", "Paramétrique Student"), ("ewma", "EWMA (RiskMetrics)"),
                           ("fhs", "Historique filtrée (FHS)")]:
@@ -184,7 +217,8 @@ def onglet_backtesting(r_ptf, alpha, fenetre, ddl, lam):
             k = test_kupiec(bt["Exception"], alpha)
             c = test_christoffersen(bt["Exception"], alpha)
             f = feux_bale(bt["Exception"])
-            rejete = c["Modèle rejeté (5 %)"] or k["Modèle rejeté (5 %)"]
+            raisons[nom] = raison_du_rejet(k, c)
+            rejete = raisons[nom] is not None
             lignes[nom] = {
                 "Exceptions observées": k["Exceptions observées"],
                 "Exceptions attendues": k["Exceptions attendues"],
@@ -197,6 +231,7 @@ def onglet_backtesting(r_ptf, alpha, fenetre, ddl, lam):
         with st.container(key="carte_tests"):
             st.subheader(f"Tests de validation · VaR {pct(alpha, 1)} à 1 jour, fenêtre de {fenetre} j",
                          help=D["backtesting"])
+            conclusion_backtesting(raisons)
             # Les valeurs restent des nombres (alignés à droite) ; seul leur affichage est formaté
             tests = pd.DataFrame(lignes).T.style.format({"Exceptions attendues": nombre,
                                                           "p-value Kupiec": p_value,
@@ -236,7 +271,7 @@ def onglet_backtesting(r_ptf, alpha, fenetre, ddl, lam):
                                      marker=dict(color=COULEUR_EXCEPTION, size=9, symbol="x")))
             fig.update_layout(height=360, hovermode="x unified", yaxis_tickformat=".1%")
             afficher(fig)
-
+        return pd.DataFrame(lignes).T
 
 
 # =============================================================================
@@ -246,6 +281,7 @@ def onglet_stress_tests(tickers, noms_titres, poids, montant, res_1j):
     """Crises historiques et scénario hypothétique.
 
     res_1j : VaR et ES à 1 jour de la méthode mise en avant
+    Renvoie le tableau des crises historiques (pour l'export).
     """
     stress = lancer_stress(tuple(tickers), tuple(float(p) for p in poids))
     stress_aff = stress.copy()
@@ -296,3 +332,4 @@ def onglet_stress_tests(tickers, noms_titres, poids, montant, res_1j):
         h1, h2 = st.columns(2)
         h1.metric("Perte du portefeuille", pct(perte_hyp), help=D["stress_hypothetique"])
         h2.metric("Perte en euros", euros(perte_hyp * montant), help=D["stress_hypothetique"])
+    return stress_aff

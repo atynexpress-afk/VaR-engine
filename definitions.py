@@ -39,6 +39,9 @@ DEFINITIONS = {
                "**Historique filtrée (FHS)** : les pertes passées sont remises à l'échelle de la "
                "volatilité EWMA actuelle. Elle combine les queues épaisses de la méthode "
                "historique et la réactivité de l'EWMA.",
+    "export": "Fichier Excel avec une feuille par thème : paramètres utilisés, VaR et ES de "
+              "chaque méthode, tests de backtesting et stress tests historiques. Les valeurs "
+              "restent des nombres, pour pouvoir refaire des calculs dans Excel.",
     "lambda": "Facteur de lissage λ de la volatilité EWMA : σ²(t+1) = λ·σ²(t) + (1 − λ)·r(t)². "
               "Plus λ est petit, plus la volatilité réagit vite aux derniers jours. RiskMetrics "
               "(JP Morgan) retient 0,94 pour des données journalières.",

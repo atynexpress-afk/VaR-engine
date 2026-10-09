@@ -10,6 +10,7 @@ Elle assemble les modules du projet :
   formats.py      -> mise en forme des nombres à la française
   guide.py        -> guide de démarrage affiché à l'ouverture
   onglets.py      -> contenu des quatre onglets
+  export.py       -> export des résultats en Excel
 
 Lancement dans le terminal :  streamlit run app.py
 """
@@ -28,6 +29,7 @@ from formats import euros, pct
 from style import appliquer_style, pastilles
 from guide import afficher_guide, rouvrir_guide
 from onglets import onglet_portefeuille, onglet_var_es, onglet_backtesting, onglet_stress_tests
+from export import creer_excel
 
 
 # =============================================================================
@@ -285,9 +287,38 @@ with onglet_ptf:
 with onglet_var:
     onglet_var_es(resultats_1j, tableau, r_ptf, methode_principale, horizon, montant)
 with onglet_bt:
-    onglet_backtesting(r_ptf, alpha, fenetre, ddl, lam)
+    tests = onglet_backtesting(r_ptf, alpha, fenetre, ddl, lam)
 with onglet_stress:
-    onglet_stress_tests(tickers, noms_titres, poids, montant, resultats_1j[methode_principale])
+    stress = onglet_stress_tests(tickers, noms_titres, poids, montant,
+                                 resultats_1j[methode_principale])
+
+
+# =============================================================================
+# 6. EXPORT EXCEL (en bas de la barre latérale)
+# Les appels à st.sidebar placés ici s'ajoutent sous les réglages : on peut
+# ainsi exporter les résultats des onglets, calculés juste au-dessus.
+# =============================================================================
+parametres = {
+    "Titres": ", ".join(f"{nom} ({p:.1%})" for nom, p in zip(noms_titres, poids)),
+    "Valeur du portefeuille (€)": montant,
+    "Période": f"{debut:%d/%m/%Y} → {fin:%d/%m/%Y}",
+    "Niveau de confiance": alpha,
+    "Horizon (jours)": horizon,
+    "Méthode mise en avant": methode_principale,
+    "Degrés de liberté (Student)": ddl,
+    "Simulations Monte Carlo": n_sim,
+    "Graine aléatoire": graine,
+    "Facteur de lissage λ": lam,
+    "Fenêtre du backtesting (jours)": fenetre,
+}
+var_es = pd.DataFrame({"VaR (%)": tableau["VaR"], "ES (%)": tableau["ES"],
+                       "VaR (€)": tableau["VaR"] * montant, "ES (€)": tableau["ES"] * montant})
+st.sidebar.header("Export")
+st.sidebar.download_button("Télécharger les résultats (Excel)",
+                           data=creer_excel(parametres, var_es, tests, stress),
+                           file_name=f"var_engine_{fin:%Y%m%d}.xlsx",
+                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                           key="export_excel", width="stretch", help=D["export"])
 
 st.write("")
 st.caption("Projet pédagogique — données Yahoo Finance. Ne constitue pas un outil de gestion "

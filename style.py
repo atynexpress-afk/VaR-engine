@@ -119,6 +119,15 @@ div:has(> [role="tablist"]) {{ border: none !important; box-shadow: none !import
 .legende-segments {{ display: flex; justify-content: space-between;
                      color: {TEXTE_SECONDAIRE}; font-size: 0.85rem; }}
 
+/* ---- Encadré de conclusion (backtesting) ---- */
+.encadre {{ border-radius: 16px; padding: 0.9rem 1.1rem; margin: 0.2rem 0 1rem 0;
+            border-left: 4px solid; font-size: 0.95rem; line-height: 1.5; color: {TEXTE}; }}
+.encadre-succes {{ background: #eaf7f0; border-color: {ZONES['Verte']}; }}
+.encadre-alerte {{ background: #fdf3e2; border-color: {ZONES['Orange']}; }}
+.encadre-titre {{ font-weight: 600; margin-bottom: 0.3rem; }}
+.encadre ul {{ margin: 0; padding-left: 1.1rem; }}
+.encadre li {{ color: {TEXTE_SECONDAIRE}; margin: 0.1rem 0; }}
+
 /* ---- Guide de démarrage (fenêtre au-dessus de l'application) ---- */
 /* La fenêtre est créée en dehors de .stApp : on lui redonne la police et les coins arrondis */
 [data-testid="stDialog"] [role="dialog"] {{ border-radius: 24px !important; background: {CARTE}; }}
@@ -223,4 +232,16 @@ def barre_exceptions(n_exceptions, n_segments=12):
     html += "</div>"
     html += ('<div class="legende-segments"><span>Verte 0–4</span>'
              '<span>Orange 5–9</span><span>Rouge 10+</span></div>')
+    st.markdown(html, unsafe_allow_html=True)
+
+
+def encadre(titre, lignes, ton="succes"):
+    """
+    Encadré de synthèse coloré : un titre en gras et une liste de points.
+    ton : "succes" (vert) ou "alerte" (orange)
+    """
+    html = f'<div class="encadre encadre-{ton}"><div class="encadre-titre">{titre}</div>'
+    if lignes:
+        html += "<ul>" + "".join(f"<li>{ligne}</li>" for ligne in lignes) + "</ul>"
+    html += "</div>"
     st.markdown(html, unsafe_allow_html=True)
