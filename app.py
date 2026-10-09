@@ -212,20 +212,23 @@ alpha = st.sidebar.select_slider("Niveau de confiance",
 horizon = st.sidebar.slider("Horizon (jours)", min_value=1, max_value=20, value=1,
                             help=D["horizon"])
 methode_principale = st.sidebar.selectbox("Méthode mise en avant", METHODES, help=D["methode"])
-ddl = st.sidebar.slider("Degrés de liberté (loi de Student)", min_value=3, max_value=30, value=5,
-                        help=D["ddl"])
-n_sim = st.sidebar.select_slider("Nombre de simulations Monte Carlo",
-                                 options=[1_000, 5_000, 10_000, 50_000, 100_000], value=10_000,
-                                 format_func=lambda x: f"{x:,}".replace(",", " "), help=D["n_sim"])
-graine = st.sidebar.number_input("Graine aléatoire (Monte Carlo)", min_value=0,
-                                 max_value=10_000, value=42, help=D["graine"])
-lam = st.sidebar.slider("Facteur de lissage λ (EWMA et FHS)", min_value=0.85, max_value=0.99,
-                        value=LAMBDA_RISKMETRICS, step=0.01, help=D["lambda"])
 
-# ---- 2.3 Backtesting ----
-st.sidebar.header("Backtesting")
-fenetre = st.sidebar.slider("Fenêtre d'estimation (jours)", min_value=100, max_value=750,
-                            value=250, step=50, help=D["fenetre"])
+# ---- 2.3 Paramètres avancés ----
+# Réglages pour spécialistes, repliés par défaut pour ne pas intimider les débutants.
+# Dans un expander, on écrit st.slider (et non st.sidebar.slider) : le
+# « with » place automatiquement les champs à l'intérieur du bloc.
+with st.sidebar.expander("Paramètres avancés"):
+    ddl = st.slider("Degrés de liberté (loi de Student)", min_value=3, max_value=30, value=5,
+                    help=D["ddl"])
+    n_sim = st.select_slider("Nombre de simulations Monte Carlo",
+                             options=[1_000, 5_000, 10_000, 50_000, 100_000], value=10_000,
+                             format_func=lambda x: f"{x:,}".replace(",", " "), help=D["n_sim"])
+    graine = st.number_input("Graine aléatoire (Monte Carlo)", min_value=0, max_value=10_000,
+                             value=42, help=D["graine"])
+    lam = st.slider("Facteur de lissage λ (EWMA et FHS)", min_value=0.85, max_value=0.99,
+                    value=LAMBDA_RISKMETRICS, step=0.01, help=D["lambda"])
+    fenetre = st.slider("Fenêtre du backtesting (jours)", min_value=100, max_value=750,
+                        value=250, step=50, help=D["fenetre"])
 
 
 # =============================================================================

@@ -95,7 +95,8 @@ ETAPES = [
                   sur ce qui s'est passé, est la plus intuitive. « Historique filtrée »
                   est la plus fiable : c'est elle qui réagit le mieux aux crises.</li>
             </ul>
-            <p>Les autres réglages s'adressent aux spécialistes : tu peux les laisser tels quels.</p>
+            <p>Les autres réglages, rangés dans le bloc <b>Paramètres avancés</b>, s'adressent
+            aux spécialistes : tu peux les laisser tels quels.</p>
         """,
         "exemple": """
             <b>Astuce</b> : chaque réglage et chaque résultat a une petite icône
