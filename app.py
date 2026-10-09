@@ -7,6 +7,7 @@ Elle assemble les modules du projet :
   backtesting.py  -> backtesting et stress tests
   definitions.py  -> définitions affichées par les icônes d'aide
   style.py        -> apparence (couleurs, CSS, modèle des graphiques)
+  guide.py        -> guide de démarrage affiché à l'ouverture
 
 Lancement dans le terminal :  streamlit run app.py
 """
@@ -27,6 +28,7 @@ from backtesting import (var_glissante, test_kupiec, test_christoffersen, feux_b
 from definitions import DEFINITIONS as D      # D["var"] renvoie la définition de la VaR
 from style import (appliquer_style, afficher, pastilles, barre_exceptions,
                    COULEURS, COULEUR_PORTEFEUILLE, COULEUR_PERTES, COULEUR_EXCEPTION, ACCENT)
+from guide import afficher_guide, rouvrir_guide
 
 
 # =============================================================================
@@ -34,6 +36,7 @@ from style import (appliquer_style, afficher, pastilles, barre_exceptions,
 # =============================================================================
 st.set_page_config(page_title="VaR Engine", layout="wide")
 appliquer_style()
+afficher_guide()          # guide de démarrage, tant qu'il n'a pas été vu ou passé
 
 MAX_ACTIONS = 8
 
@@ -123,6 +126,8 @@ def lancer_stress(tickers, poids):
 # Le paramètre help=... ajoute l'icône d'aide qui affiche la définition.
 # =============================================================================
 st.sidebar.title("VaR Engine")
+st.sidebar.button("Revoir le guide", key="revoir_guide", on_click=rouvrir_guide,
+                  help="Rouvre le guide de démarrage pour les débutants.")
 
 # ---- 2.1 Portefeuille ----
 st.sidebar.header("Portefeuille")

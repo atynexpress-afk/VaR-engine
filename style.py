@@ -118,6 +118,37 @@ div:has(> [role="tablist"]) {{ border: none !important; box-shadow: none !import
 .segment {{ flex: 1; height: 26px; border-radius: 999px; }}
 .legende-segments {{ display: flex; justify-content: space-between;
                      color: {TEXTE_SECONDAIRE}; font-size: 0.85rem; }}
+
+/* ---- Guide de démarrage (fenêtre au-dessus de l'application) ---- */
+/* La fenêtre est créée en dehors de .stApp : on lui redonne la police et les coins arrondis */
+[data-testid="stDialog"] [role="dialog"] {{ border-radius: 24px !important; background: {CARTE}; }}
+[data-testid="stDialog"] [role="dialog"] *:not([data-testid="stIconMaterial"]) {{ font-family: 'Outfit', 'Segoe UI', sans-serif !important; }}
+[data-testid="stDialog"] [role="dialog"] h2 {{ font-weight: 400; letter-spacing: -0.01em; }}
+.guide-progression {{ display: flex; align-items: center; gap: 6px; margin-bottom: 0.9rem; }}
+.guide-point {{ width: 8px; height: 8px; border-radius: 999px; background: #d9dce5; }}
+.guide-point.actif {{ width: 26px;
+                      background: linear-gradient(135deg, {ACCENT_CLAIR} 0%, {ACCENT} 100%); }}
+.guide-compteur {{ margin-left: auto; color: {TEXTE_SECONDAIRE}; font-size: 0.85rem; }}
+.guide-titre {{ font-weight: 500 !important; font-size: 1.35rem !important; color: {TEXTE};
+                padding: 0 0 0.4rem 0 !important; }}
+.guide-texte, .guide-texte li {{ color: {TEXTE}; font-size: 0.98rem; line-height: 1.55; }}
+.guide-texte ul {{ padding-left: 1.1rem; }}
+.guide-texte li {{ margin-bottom: 0.35rem; }}
+.guide-exemple {{ background: #f4f5f9; border-left: 3px solid {ACCENT}; border-radius: 14px;
+                  padding: 0.8rem 1rem; margin: 0.4rem 0 1rem 0; color: {TEXTE};
+                  font-size: 0.93rem; line-height: 1.5; }}
+.guide-aide {{ display: inline-flex; align-items: center; justify-content: center;
+               width: 1.1rem; height: 1.1rem; border-radius: 999px; font-size: 0.75rem;
+               border: 1px solid {TEXTE_SECONDAIRE}; color: {TEXTE_SECONDAIRE}; }}
+/* Boutons du guide : même dégradé que l'onglet sélectionné */
+.st-key-guide_suivant button, .st-key-guide_commencer button {{
+    background: linear-gradient(135deg, {ACCENT_CLAIR} 0%, {ACCENT} 100%) !important;
+    border: none !important; border-radius: 999px !important;
+    box-shadow: 0 6px 18px rgba(91, 108, 240, 0.35);
+}}
+.st-key-guide_precedent button {{ border-radius: 999px !important; }}
+.st-key-guide_passer button p {{ color: {TEXTE_SECONDAIRE}; }}
+.st-key-revoir_guide button {{ border-radius: 999px !important; }}
 </style>
 """
 
