@@ -1,6 +1,9 @@
-numpy
-pandas
-scipy
-yfinance
-plotly
-streamlit
+# Versions encadrées : on accepte les correctifs, mais pas les versions majeures
+# qui pourraient casser l'application sans prévenir.
+# Streamlit >= 1.65 est nécessaire (fenêtre du guide, options des métriques).
+numpy>=2.0,<3
+pandas>=2.2,<4
+scipy>=1.13,<2
+yfinance>=1.0,<2
+plotly>=6.0,<8
+streamlit>=1.65,<2
