@@ -51,6 +51,8 @@ ACTIONS = {
     "EssilorLuxottica": "EL.PA",
 }
 
+NOMS = {code: nom for nom, code in ACTIONS.items()}   # code Yahoo -> nom affiché
+
 METHODES = ["Historique", "Paramétrique normale", "Paramétrique Student", "Monte Carlo"]
 
 
@@ -62,6 +64,21 @@ def euros(x):
 def pct(x, decimales=2):
     """Formate un nombre en pourcentage à la française : 0.0235 -> '2,35 %'."""
     return f"{x * 100:.{decimales}f} %".replace(".", ",")
+
+
+def nombre(x, decimales=1):
+    """Formate un nombre décimal à la française : 19.94 -> '19,9'."""
+    return f"{x:.{decimales}f}".replace(".", ",")
+
+
+def p_value(x):
+    """Formate une p-value : les valeurs minuscules s'affichent '< 0,001' plutôt que '0'."""
+    return "< 0,001" if x < 0.001 else nombre(x, 3)
+
+
+def nom_titre(ticker):
+    """Nom lisible d'un titre : 'MC.PA' -> 'LVMH' ; un ticker inconnu reste tel quel."""
+    return NOMS.get(ticker, ticker)
 
 
 def colonne(definition):
@@ -164,7 +181,7 @@ poids_bruts = []
 for t in tickers:
     # key relie le champ à st.session_state ; on_change appelle la fonction de
     # rééquilibrage dès que l'utilisateur modifie la valeur.
-    p = st.sidebar.number_input(f"Poids {t} (%)", min_value=0.0, max_value=100.0,
+    p = st.sidebar.number_input(f"Poids {nom_titre(t)} (%)", min_value=0.0, max_value=100.0,
                                 step=5.0, format="%.1f", key=f"poids_{t}",
                                 on_change=reequilibrer_poids, args=(t, tickers),
                                 help=D["poids"])
@@ -177,8 +194,10 @@ poids = normaliser_poids(poids_bruts)
 
 montant = st.sidebar.number_input("Valeur du portefeuille (€)", min_value=1_000,
                                   value=1_000_000, step=100_000, help=D["montant"])
-debut = st.sidebar.date_input("Date de début", value=datetime.date(2018, 1, 1), help=D["periode"])
-fin = st.sidebar.date_input("Date de fin", value=datetime.date.today(), help=D["periode"])
+debut = st.sidebar.date_input("Date de début", value=datetime.date(2018, 1, 1),
+                              format="DD/MM/YYYY", help=D["periode"])
+fin = st.sidebar.date_input("Date de fin", value=datetime.date.today(),
+                            format="DD/MM/YYYY", help=D["periode"])
 if debut >= fin:
     st.error("La date de début doit être antérieure à la date de fin.")
     st.stop()
@@ -213,6 +232,11 @@ try:
 except ValueError as erreur:
     st.error(str(erreur))
     st.stop()
+
+# Les colonnes portent désormais les noms lisibles (LVMH plutôt que MC.PA) :
+# tableaux et graphiques les reprennent automatiquement.
+noms_titres = [nom_titre(t) for t in tickers]
+prix.columns = noms_titres
 
 if len(prix) < 60:
     st.error("Moins de 60 jours de données : élargis la période.")
@@ -288,7 +312,7 @@ with onglet_ptf:
         st.subheader("Évolution des prix (base 100)", help=D["base100"])
         base100 = prix / prix.iloc[0] * 100
         fig = go.Figure()
-        for i, t in enumerate(tickers):
+        for i, t in enumerate(noms_titres):
             fig.add_trace(go.Scatter(x=base100.index, y=base100[t], name=t, mode="lines",
                                      line=dict(width=1.5, color=COULEURS[i], shape="spline")))
         fig.add_trace(go.Scatter(x=base100.index, y=base100 @ poids, name="Portefeuille",
@@ -304,7 +328,7 @@ with onglet_ptf:
             "Poids": poids,
             "Rendement annuel": rendements.mean().values * 252,
             "Volatilité annuelle": rendements.std().values * np.sqrt(252),
-        }, index=tickers)
+        }, index=noms_titres)
         stats_actifs.loc["Portefeuille"] = [1.0, r_ptf.mean() * 252, r_ptf.std() * np.sqrt(252)]
         st.dataframe(stats_actifs.style.format(lambda x: pct(x, 1)), column_config={
             "Poids": colonne(D["poids"]),
@@ -348,7 +372,8 @@ with onglet_var:
         fig = px.bar(long, x="index", y="Perte (€)", color="Mesure", barmode="group",
                      color_discrete_sequence=COULEURS[:2], labels={"index": "", "Perte (€)": ""})
         fig.update_layout(height=300, bargap=0.35, bargroupgap=0.1, legend_title_text="",
-                          xaxis_tickangle=0, yaxis_ticksuffix=" €")
+                          xaxis_tickangle=0, yaxis_ticksuffix=" €",
+                          yaxis_tickformat=",.0f")
         afficher(fig)
 
     col_g, col_d = st.columns(2)
@@ -415,9 +440,9 @@ with onglet_bt:
             rejete = c["Modèle rejeté (5 %)"] or k["Modèle rejeté (5 %)"]
             lignes[nom] = {
                 "Exceptions observées": k["Exceptions observées"],
-                "Exceptions attendues": round(k["Exceptions attendues"], 1),
-                "p-value Kupiec": round(k["p-value"], 3),
-                "p-value Christoffersen": round(c["p-value couverture conditionnelle"], 3),
+                "Exceptions attendues": k["Exceptions attendues"],
+                "p-value Kupiec": k["p-value"],
+                "p-value Christoffersen": c["p-value couverture conditionnelle"],
                 "Verdict (5 %)": "Rejeté" if rejete else "Accepté",
                 "Zone Bâle (250 j)": f"{f['Zone']} ({f['Exceptions sur 250 jours']})",
             }
@@ -425,7 +450,11 @@ with onglet_bt:
         with st.container(key="carte_tests"):
             st.subheader(f"Tests de validation · VaR {pct(alpha, 1)} à 1 jour, fenêtre de {fenetre} j",
                          help=D["backtesting"])
-            st.dataframe(pd.DataFrame(lignes).T, column_config={
+            # Les valeurs restent des nombres (alignés à droite) ; seul leur affichage est formaté
+            tests = pd.DataFrame(lignes).T.style.format({"Exceptions attendues": nombre,
+                                                          "p-value Kupiec": p_value,
+                                                          "p-value Christoffersen": p_value})
+            st.dataframe(tests, column_config={
                 "Exceptions observées": colonne(D["exception"]),
                 "Exceptions attendues": colonne(D["exceptions_attendues"]),
                 "p-value Kupiec": colonne(D["kupiec"]),
@@ -439,8 +468,9 @@ with onglet_bt:
             choix = st.selectbox("Méthode à visualiser", list(backtests), help=D["methode"])
             bt = backtests[choix]
             f = feux_bale(bt["Exception"])
-            st.metric(f"Exceptions sur 250 jours · zone {f['Zone'].lower()}",
-                      f"{f['Exceptions sur 250 jours']}", help=D["bale"])
+            st.metric("Exceptions sur 250 jours", f"{f['Exceptions sur 250 jours']}",
+                      delta=f"Zone {f['Zone'].lower()}", delta_color="off", delta_arrow="off",
+                      help=D["bale"])
             barre_exceptions(f["Exceptions sur 250 jours"])
             if alpha != 0.99:
                 st.caption("Les feux tricolores sont définis pour une VaR à 99 % : "
@@ -496,8 +526,9 @@ with onglet_stress:
         colonnes = st.columns(min(len(tickers), 4))
         chocs = []
         for i, t in enumerate(tickers):
-            choc = colonnes[i % len(colonnes)].slider(f"Choc {t} (%)", min_value=-60, max_value=30,
-                                                      value=-20, step=5, help=D["choc"])
+            choc = colonnes[i % len(colonnes)].slider(f"Choc {nom_titre(t)} (%)", min_value=-60,
+                                                      max_value=30, value=-20, step=5,
+                                                      help=D["choc"])
             chocs.append(choc / 100)
         perte_hyp = stress_hypothetique(poids, chocs)
         h1, h2 = st.columns(2)

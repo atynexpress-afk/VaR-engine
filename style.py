@@ -176,6 +176,7 @@ MODELE.layout = go.Layout(
     legend=dict(orientation="h", y=-0.18, x=0, font=dict(color=TEXTE_SECONDAIRE)),
     margin=dict(l=10, r=10, t=20, b=10),
     barcornerradius=8,
+    separators=", ",          # virgule décimale et espace pour les milliers, à la française
 )
 pio.templates["var_engine"] = MODELE
 pio.templates.default = "var_engine"
