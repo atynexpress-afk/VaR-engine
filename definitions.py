@@ -109,7 +109,9 @@ DEFINITIONS = {
                          "pendant une crise passée, avec un achat au début de la crise et sans "
                          "rééquilibrage.",
     "perte_totale": "Perte cumulée du portefeuille entre le début et la fin du scénario.",
-    "pire_journee": "Plus forte perte journalière du portefeuille pendant le scénario.",
+    "pire_journee": "Plus forte perte journalière du portefeuille pendant le scénario. Elle se "
+                    "compare à la VaR et à l'ES à 1 jour, qui portent sur la même durée : une "
+                    "pire journée bien au-delà de l'ES montre que le modèle sous-estime les crises.",
     "stress_hypothetique": "Scénario défini par l'utilisateur : un choc instantané est appliqué "
                            "au prix de chaque titre. Perte = − somme des poids × chocs.",
     "choc": "Variation instantanée appliquée au prix du titre, en pourcentage.",

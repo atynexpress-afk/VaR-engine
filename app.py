@@ -510,13 +510,24 @@ with onglet_stress:
                                     "Pire journée": colonne(D["pire_journee"]),
                                     "Perte (€)": colonne(D["perte_totale"])})
     with col_d.container(key="carte_stress_graphique"):
-        st.subheader("Pertes de crise face à la VaR", help=D["var"])
+        # On compare des pertes sur la MÊME durée : la pire journée de chaque crise
+        # face à la VaR et à l'ES à 1 jour (la perte totale porte sur plusieurs semaines).
+        st.subheader("Pire journée de crise face à la VaR 1 j", help=D["pire_journee"])
         if len(disponibles) > 0:
-            fig = px.bar(disponibles.reset_index(), x="Perte totale", y="index", orientation="h",
-                         color_discrete_sequence=[ACCENT], labels={"index": "", "Perte totale": ""})
-            fig.add_vline(x=principal["VaR"], line_dash="dash", line_color=COULEURS[7],
-                          annotation_text=f"VaR ({horizon} j)")
-            fig.update_layout(height=260, xaxis_tickformat=".0%", bargap=0.4)
+            res_1j = resultats_1j[methode_principale]
+            fig = px.bar(disponibles.reset_index(), x="Pire journée", y="index", orientation="h",
+                         color_discrete_sequence=[ACCENT], labels={"index": "", "Pire journée": ""})
+            # Lignes verticales, avec leur étiquette au-dessus du graphique pour ne pas
+            # chevaucher les barres : la VaR à gauche de sa ligne, l'ES à droite.
+            for mesure, couleur, trait, cote in [("VaR", COULEURS[7], "dash", "right"),
+                                                 ("ES", COULEURS[6], "dot", "left")]:
+                fig.add_vline(x=res_1j[mesure], line_dash=trait, line_color=couleur)
+                fig.add_annotation(x=res_1j[mesure], y=1, yref="paper", yanchor="bottom",
+                                   xanchor=cote, showarrow=False,
+                                   text=f"{mesure} {pct(res_1j[mesure], 1)}",
+                                   font=dict(color=couleur))
+            fig.update_layout(height=300, xaxis_tickformat=".0%", bargap=0.4,
+                              margin=dict(t=40))
             afficher(fig)
         else:
             st.info("Aucune donnée disponible sur ces périodes pour les titres choisis.")
