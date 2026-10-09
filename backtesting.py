@@ -16,24 +16,32 @@ from scipy import stats
 from scipy.special import xlogy
 
 from data import normaliser_poids, telecharger_prix
-from var_models import var_historique, var_parametrique
+from var_models import var_historique, var_parametrique, volatilite_ewma, LAMBDA_RISKMETRICS
 
 
 # ---------------------------------------------------------------------------
 # 1. VaR GLISSANTE ET EXCEPTIONS
 # ---------------------------------------------------------------------------
-def var_glissante(r_ptf, alpha=0.99, fenetre=250, methode="historique", ddl=5):
+def var_glissante(r_ptf, alpha=0.99, fenetre=250, methode="historique", ddl=5,
+                  lam=LAMBDA_RISKMETRICS):
     """
     Calcule, pour chaque jour t, la VaR estimée sur les `fenetre` jours
     précédents (de t-fenetre à t-1), puis la compare à la perte du jour t.
 
-    methode : "historique", "normale" ou "student"
+    methode : "historique", "normale", "student", "ewma" ou "fhs"
+    Pour "ewma" et "fhs", la volatilité EWMA est calculée une seule fois sur
+    toute la série : sigma[t] n'utilise que les rendements jusqu'à t-1,
+    il n'y a donc pas de regard vers le futur.
     Renvoie un DataFrame avec une ligne par jour :
       Perte, VaR, Exception (True si la perte a dépassé la VaR)
     """
     r_ptf = pd.Series(r_ptf)
     if len(r_ptf) <= fenetre:
         raise ValueError("Pas assez de données : il faut plus de jours que la taille de la fenêtre.")
+
+    if methode in ("ewma", "fhs"):
+        sigma = volatilite_ewma(r_ptf, lam)
+        chocs = r_ptf.values / sigma[:-1]           # rendements standardisés
 
     dates, vars_ = [], []
     for t in range(fenetre, len(r_ptf)):
@@ -44,8 +52,13 @@ def var_glissante(r_ptf, alpha=0.99, fenetre=250, methode="historique", ddl=5):
             res = var_parametrique(passe, alpha, "normale")
         elif methode == "student":
             res = var_parametrique(passe, alpha, "student", ddl)
+        elif methode == "ewma":
+            res = {"VaR": sigma[t] * stats.norm.ppf(alpha)}
+        elif methode == "fhs":
+            res = {"VaR": sigma[t] * var_historique(chocs[t - fenetre:t], alpha)["VaR"]}
         else:
-            raise ValueError("methode doit valoir 'historique', 'normale' ou 'student'")
+            raise ValueError("methode doit valoir 'historique', 'normale', 'student', "
+                             "'ewma' ou 'fhs'")
         dates.append(r_ptf.index[t])
         vars_.append(res["VaR"])
 
@@ -227,7 +240,7 @@ if __name__ == "__main__":
     prix = telecharger_prix(tickers, debut="2018-01-01")
     r_ptf = rendements_portefeuille(calculer_rendements(prix), poids)
 
-    for methode in ["historique", "normale", "student"]:
+    for methode in ["historique", "normale", "student", "ewma", "fhs"]:
         bt = var_glissante(r_ptf, alpha=0.99, fenetre=250, methode=methode)
         k = test_kupiec(bt["Exception"], 0.99)
         c = test_christoffersen(bt["Exception"], 0.99)

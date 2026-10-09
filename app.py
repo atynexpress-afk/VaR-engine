@@ -22,7 +22,8 @@ import streamlit as st
 from scipy import stats
 
 from data import telecharger_prix, calculer_rendements, rendements_portefeuille, normaliser_poids
-from var_models import var_historique, var_parametrique, var_monte_carlo, changer_horizon
+from var_models import (var_historique, var_parametrique, var_monte_carlo, var_ewma,
+                        var_historique_filtree, changer_horizon, LAMBDA_RISKMETRICS)
 from backtesting import (var_glissante, test_kupiec, test_christoffersen, feux_bale,
                          stress_historiques, stress_hypothetique)
 from definitions import DEFINITIONS as D      # D["var"] renvoie la définition de la VaR
@@ -53,7 +54,8 @@ ACTIONS = {
 
 NOMS = {code: nom for nom, code in ACTIONS.items()}   # code Yahoo -> nom affiché
 
-METHODES = ["Historique", "Paramétrique normale", "Paramétrique Student", "Monte Carlo"]
+METHODES = ["Historique", "Paramétrique normale", "Paramétrique Student", "Monte Carlo",
+            "EWMA (RiskMetrics)", "Historique filtrée (FHS)"]
 
 
 def euros(x):
@@ -129,8 +131,8 @@ def charger_prix(tickers, debut, fin):
 
 
 @st.cache_data(show_spinner="Backtesting en cours…")
-def lancer_backtest(r_ptf, alpha, fenetre, methode, ddl):
-    return var_glissante(r_ptf, alpha, fenetre, methode, ddl)
+def lancer_backtest(r_ptf, alpha, fenetre, methode, ddl, lam):
+    return var_glissante(r_ptf, alpha, fenetre, methode, ddl, lam)
 
 
 @st.cache_data(show_spinner="Téléchargement des crises historiques…")
@@ -217,6 +219,8 @@ n_sim = st.sidebar.select_slider("Nombre de simulations Monte Carlo",
                                  format_func=lambda x: f"{x:,}".replace(",", " "), help=D["n_sim"])
 graine = st.sidebar.number_input("Graine aléatoire (Monte Carlo)", min_value=0,
                                  max_value=10_000, value=42, help=D["graine"])
+lam = st.sidebar.slider("Facteur de lissage λ (EWMA et FHS)", min_value=0.85, max_value=0.99,
+                        value=LAMBDA_RISKMETRICS, step=0.01, help=D["lambda"])
 
 # ---- 2.3 Backtesting ----
 st.sidebar.header("Backtesting")
@@ -251,6 +255,8 @@ try:
         "Paramétrique normale": var_parametrique(r_ptf, alpha, "normale"),
         "Paramétrique Student": var_parametrique(r_ptf, alpha, "student", ddl),
         "Monte Carlo": var_monte_carlo(rendements, poids, alpha, n_sim, graine),
+        "EWMA (RiskMetrics)": var_ewma(r_ptf, alpha, lam),
+        "Historique filtrée (FHS)": var_historique_filtree(r_ptf, alpha, lam),
     }
 except ValueError as erreur:
     st.error(str(erreur))
@@ -268,7 +274,7 @@ principal = resultats[methode_principale]
 # 4. EN-TÊTE : TITRE, PASTILLES DE PARAMÈTRES ET CARTES DE SYNTHÈSE
 # =============================================================================
 st.title("Mesure du risque de marché")
-st.markdown('<p class="sous-titre">VaR et Expected Shortfall par trois méthodes, '
+st.markdown('<p class="sous-titre">VaR et Expected Shortfall par six méthodes, '
             'backtesting réglementaire et stress tests.</p>', unsafe_allow_html=True)
 pastilles([
     ("Méthode", methode_principale),
@@ -367,8 +373,11 @@ with onglet_var:
         # Format « long » pour Plotly : une ligne par (méthode, mesure)
         long = (tableau * montant).reset_index().melt(id_vars="index", var_name="Mesure",
                                                      value_name="Perte (€)")
-        # <br> force un retour à la ligne dans les libellés trop longs
-        long["index"] = long["index"].str.replace("Paramétrique ", "Paramétrique<br>")
+        # Noms courts pour que les six libellés tiennent sous les barres
+        long["index"] = long["index"].map({
+            "Historique": "Historique", "Paramétrique normale": "Normale",
+            "Paramétrique Student": "Student", "Monte Carlo": "Monte Carlo",
+            "EWMA (RiskMetrics)": "EWMA", "Historique filtrée (FHS)": "FHS"})
         fig = px.bar(long, x="index", y="Perte (€)", color="Mesure", barmode="group",
                      color_discrete_sequence=COULEURS[:2], labels={"index": "", "Perte (€)": ""})
         fig.update_layout(height=300, bargap=0.35, bargroupgap=0.1, legend_title_text="",
@@ -431,8 +440,9 @@ with onglet_bt:
         lignes = {}
         backtests = {}
         for code, nom in [("historique", "Historique"), ("normale", "Paramétrique normale"),
-                          ("student", "Paramétrique Student")]:
-            bt = lancer_backtest(r_ptf, alpha, fenetre, code, ddl)
+                          ("student", "Paramétrique Student"), ("ewma", "EWMA (RiskMetrics)"),
+                          ("fhs", "Historique filtrée (FHS)")]:
+            bt = lancer_backtest(r_ptf, alpha, fenetre, code, ddl, lam)
             backtests[nom] = bt
             k = test_kupiec(bt["Exception"], alpha)
             c = test_christoffersen(bt["Exception"], alpha)

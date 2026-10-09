@@ -71,7 +71,7 @@ ETAPES = [
             <ul>
               <li><b>Portefeuille</b> : l'évolution des prix de tes actions et la façon dont elles
                   montent ou baissent ensemble.</li>
-              <li><b>VaR & ES</b> : les résultats détaillés, calculés de quatre façons différentes
+              <li><b>VaR & ES</b> : les résultats détaillés, calculés de six façons différentes
                   pour pouvoir les comparer.</li>
               <li><b>Backtesting</b> : on vérifie si l'outil aurait eu raison dans le passé.
                   Un feu <b>vert</b> veut dire que le calcul est fiable, <b>orange</b> ou <b>rouge</b>
@@ -92,7 +92,8 @@ ETAPES = [
               <li><b>Horizon</b> : la durée considérée. 10 jours = « combien puis-je perdre
                   en deux semaines ? ».</li>
               <li><b>Méthode</b> : la façon de calculer. « Historique », qui se base simplement
-                  sur ce qui s'est passé, est la plus intuitive.</li>
+                  sur ce qui s'est passé, est la plus intuitive. « Historique filtrée »
+                  est la plus fiable : c'est elle qui réagit le mieux aux crises.</li>
             </ul>
             <p>Les autres réglages s'adressent aux spécialistes : tu peux les laisser tels quels.</p>
         """,

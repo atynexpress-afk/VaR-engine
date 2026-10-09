@@ -11,8 +11,8 @@ Projet réalisé dans le cadre du Master 2 Ingénierie des risques économiques 
 ## Fonctionnalités
 
 - **Portefeuille paramétrable** : actions du CAC 40 ou tout ticker Yahoo Finance, poids rééquilibrés automatiquement, période et montant au choix.
-- **Trois méthodes de VaR et d'ES** : historique, paramétrique (loi normale et loi de Student) et Monte Carlo avec corrélations.
-- **Tous les paramètres modifiables** : niveau de confiance, horizon, degrés de liberté, nombre de simulations, graine aléatoire, fenêtre d'estimation.
+- **Six méthodes de VaR et d'ES** : historique, paramétrique (loi normale et loi de Student), Monte Carlo avec corrélations, EWMA (RiskMetrics) et historique filtrée (FHS).
+- **Tous les paramètres modifiables** : niveau de confiance, horizon, degrés de liberté, nombre de simulations, graine aléatoire, facteur de lissage λ, fenêtre d'estimation.
 - **Backtesting** : VaR glissante hors échantillon, tests de Kupiec et de Christoffersen, feux tricolores de Bâle.
 - **Stress tests** : crises historiques (Lehman 2008, dette européenne 2011, Covid 2020, Ukraine 2022) et chocs hypothétiques définis par l'utilisateur.
 - **Diagnostic des queues de distribution** : histogramme comparé à la loi normale, QQ-plot, skewness et kurtosis.
@@ -26,10 +26,13 @@ Projet réalisé dans le cadre du Master 2 Ingénierie des risques économiques 
 | Paramétrique normale | Rendements gaussiens | VaR = −μ + σ·z_α |
 | Paramétrique Student | Queues épaisses, variance ajustée à σ | VaR = −μ + σ·√((ν−2)/ν)·t_α,ν |
 | Monte Carlo | Scénarios corrélés par décomposition de Cholesky (Σ = L·Lᵀ) | X = μ + Z·Lᵀ, puis quantile |
+| EWMA (RiskMetrics) | Volatilité conditionnelle, plus de poids aux jours récents | σ²ₜ₊₁ = λ·σ²ₜ + (1−λ)·r²ₜ, VaR = σₜ₊₁·z_α |
+| Historique filtrée (FHS) | Chocs standardisés par la volatilité EWMA, puis remis à l'échelle | VaR = σₜ₊₁ · quantile à α de (−rₜ/σₜ) |
 
 - **Expected Shortfall** : perte moyenne au-delà de la VaR, avec formules fermées pour les lois normale et de Student.
 - **Changement d'horizon** : règle de la racine du temps, VaR(h) = VaR(1) × √h.
 - **Rendements** : rendements simples, qui s'agrègent linéairement entre actifs du portefeuille.
+- **Pourquoi des modèles à volatilité variable ?** Les modèles à volatilité constante sont rejetés par le test de Christoffersen : leurs exceptions arrivent par grappes pendant les crises. L'EWMA corrige ce regroupement mais sous-estime les queues (loi normale) ; l'historique filtrée corrige les deux et passe les tests de validation sur le portefeuille par défaut.
 
 ### Validation
 

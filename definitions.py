@@ -33,7 +33,15 @@ DEFINITIONS = {
                "**Paramétrique Student** : loi aux queues plus épaisses que la normale, "
                "plus réaliste pour des actions.\n\n"
                "**Monte Carlo** : simulation de milliers de scénarios de rendements corrélés, "
-               "grâce à la décomposition de Cholesky de la matrice de covariance.",
+               "grâce à la décomposition de Cholesky de la matrice de covariance.\n\n"
+               "**EWMA (RiskMetrics)** : loi normale, mais avec une volatilité qui donne plus de "
+               "poids aux jours récents, pour réagir vite aux crises.\n\n"
+               "**Historique filtrée (FHS)** : les pertes passées sont remises à l'échelle de la "
+               "volatilité EWMA actuelle. Elle combine les queues épaisses de la méthode "
+               "historique et la réactivité de l'EWMA.",
+    "lambda": "Facteur de lissage λ de la volatilité EWMA : σ²(t+1) = λ·σ²(t) + (1 − λ)·r(t)². "
+              "Plus λ est petit, plus la volatilité réagit vite aux derniers jours. RiskMetrics "
+              "(JP Morgan) retient 0,94 pour des données journalières.",
     "ddl": "Degrés de liberté de la loi de Student. Plus ils sont faibles, plus les queues de "
            "distribution sont épaisses et plus les pertes extrêmes sont probables. Au-delà de 30, "
            "la loi de Student est très proche de la loi normale.",

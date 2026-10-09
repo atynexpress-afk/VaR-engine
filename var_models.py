@@ -1,7 +1,8 @@
 """
 var_models.py
 Calcul de la Value at Risk (VaR) et de l'Expected Shortfall (ES)
-selon trois méthodes : historique, paramétrique et Monte Carlo.
+selon plusieurs méthodes : historique, paramétrique, Monte Carlo,
+EWMA (RiskMetrics) et historique filtrée.
 
 Conventions utilisées dans tout le projet :
 - alpha = niveau de confiance (ex. 0.99 pour 99 %)
@@ -107,7 +108,62 @@ def var_monte_carlo(rendements, poids, alpha=0.99, n_sim=10_000, graine=42):
 
 
 # ---------------------------------------------------------------------------
-# 4. CHANGEMENT D'HORIZON
+# 4. MODÈLES À VOLATILITÉ VARIABLE : EWMA ET HISTORIQUE FILTRÉE
+# Les méthodes précédentes supposent une volatilité constante sur toute la
+# période. Or les marchés alternent phases calmes et phases agitées : après un
+# choc, la volatilité reste élevée plusieurs semaines. Ces deux modèles
+# donnent plus de poids aux jours récents pour réagir vite aux crises.
+# ---------------------------------------------------------------------------
+LAMBDA_RISKMETRICS = 0.94      # valeur standard de RiskMetrics (JP Morgan, 1996)
+
+
+def volatilite_ewma(r_ptf, lam=LAMBDA_RISKMETRICS, n_init=20):
+    """
+    Volatilité EWMA (moyenne mobile à pondération exponentielle) :
+        sigma²(t+1) = lam x sigma²(t) + (1 - lam) x r(t)²
+    Chaque jour, la variance d'hier garde un poids lam et le rendement du jour
+    entre avec un poids (1 - lam) : plus lam est petit, plus le modèle réagit vite.
+
+    Renvoie un tableau de longueur n + 1 : sigma[t] est la prévision pour le
+    jour t, connue dès la veille ; sigma[n] est la prévision pour demain.
+    La variance de départ est celle des n_init premiers jours.
+    """
+    r = np.asarray(r_ptf, dtype=float)
+    variance = np.empty(len(r) + 1)
+    variance[0] = np.var(r[:n_init], ddof=1)
+    for t in range(len(r)):
+        variance[t + 1] = lam * variance[t] + (1 - lam) * r[t] ** 2
+    return np.sqrt(variance)
+
+
+def var_ewma(r_ptf, alpha=0.99, lam=LAMBDA_RISKMETRICS):
+    """
+    VaR EWMA (méthode RiskMetrics) : loi normale de moyenne nulle, avec la
+    volatilité EWMA prévue pour demain à la place de la volatilité moyenne.
+    """
+    sigma = volatilite_ewma(r_ptf, lam)[-1]
+    z = stats.norm.ppf(alpha)
+    return {"VaR": sigma * z, "ES": sigma * stats.norm.pdf(z) / (1 - alpha)}
+
+
+def var_historique_filtree(r_ptf, alpha=0.99, lam=LAMBDA_RISKMETRICS):
+    """
+    VaR historique filtrée (FHS, Filtered Historical Simulation) :
+    1. on divise chaque rendement par la volatilité EWMA de son jour : on obtient
+       des chocs « standardisés », comparables entre périodes calmes et agitées ;
+    2. on prend le quantile de ces chocs, comme dans la méthode historique ;
+    3. on le remet à l'échelle de la volatilité prévue pour demain.
+    On garde ainsi les queues épaisses observées (pas d'hypothèse de loi normale)
+    tout en réagissant à la volatilité récente.
+    """
+    sigma = volatilite_ewma(r_ptf, lam)
+    chocs = np.asarray(r_ptf, dtype=float) / sigma[:-1]
+    res = var_historique(chocs, alpha)
+    return {"VaR": sigma[-1] * res["VaR"], "ES": sigma[-1] * res["ES"]}
+
+
+# ---------------------------------------------------------------------------
+# 5. CHANGEMENT D'HORIZON
 # ---------------------------------------------------------------------------
 def changer_horizon(resultat, horizon):
     """
@@ -120,7 +176,7 @@ def changer_horizon(resultat, horizon):
 
 
 # ---------------------------------------------------------------------------
-# 5. COMPARAISON DES MÉTHODES
+# 6. COMPARAISON DES MÉTHODES
 # ---------------------------------------------------------------------------
 def comparer_methodes(rendements, poids, alpha=0.99, horizon=1,
                       n_sim=10_000, ddl=5):
