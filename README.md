@@ -47,11 +47,14 @@ Projet réalisé dans le cadre du Master 2 Ingénierie des risques économiques 
 var-engine/
 ├── app.py              Interface Streamlit
 ├── data.py             Téléchargement des prix, rendements, portefeuille
-├── var_models.py       VaR et ES : historique, paramétrique, Monte Carlo
+├── var_models.py       VaR et ES : historique, paramétrique, Monte Carlo, EWMA, FHS
 ├── backtesting.py      Kupiec, Christoffersen, Bâle, stress tests
 ├── definitions.py      Définitions affichées dans l'interface
 ├── style.py            Apparence : CSS et modèle des graphiques
+├── guide.py            Guide de démarrage pour les débutants
+├── tests/              Tests automatiques (pytest)
 ├── requirements.txt    Bibliothèques nécessaires
+├── requirements-dev.txt  Outils de développement (pytest)
 └── .streamlit/
     └── config.toml     Thème de l'application
 ```
@@ -67,14 +70,25 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
+## Tests
+
+Le moteur de calcul est couvert par 37 tests automatiques, sur données simulées (sans connexion Internet) :
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest
+```
+
+Ils vérifient notamment les formules fermées de la VaR et de l'ES normales, la convergence du Monte Carlo, la récurrence EWMA, la statistique de Kupiec sur le cas de référence de Jorion (10 exceptions sur 250 jours : LR = 12,96), la détection des grappes d'exceptions par Christoffersen, les bornes des zones de Bâle, et l'absence de regard vers le futur dans le backtesting.
+
 ## Limites connues
 
 - La règle de la racine du temps suppose des rendements indépendants et de même loi, ce qui n'est pas vérifié en période de crise (regroupement de la volatilité).
-- Les méthodes historique et paramétrique sur fenêtre fixe réagissent lentement aux changements de régime, ce que le test de Christoffersen met souvent en évidence.
+- Les méthodes historique et paramétrique sur fenêtre fixe réagissent lentement aux changements de régime, ce que le test de Christoffersen met souvent en évidence. Les modèles EWMA et FHS corrigent ce point.
 - Le Monte Carlo repose sur une hypothèse gaussienne multivariée.
 - Les données proviennent de Yahoo Finance et ne sont pas contrôlées comme des données de production.
 
-**Pistes d'amélioration :** volatilité GARCH ou EWMA, VaR historique filtrée, copules pour la dépendance, théorie des valeurs extrêmes.
+**Pistes d'amélioration :** volatilité GARCH, copules pour la dépendance, théorie des valeurs extrêmes, backtesting de l'Expected Shortfall.
 
 ## Technologies
 

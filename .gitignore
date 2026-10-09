@@ -13,3 +13,6 @@ Thumbs.db
 
 # Secrets Streamlit (mots de passe, clés) : ne JAMAIS les publier
 .streamlit/secrets.toml
+
+# Cache de pytest
+.pytest_cache/
