@@ -11,6 +11,7 @@ Elle assemble les modules du projet :
   guide.py        -> guide de démarrage affiché à l'ouverture
   onglets.py      -> contenu des quatre onglets
   export.py       -> export des résultats en Excel
+  version.py      -> empreinte du moteur, pour renouveler le cache
 
 Lancement dans le terminal :  streamlit run app.py
 """
@@ -31,6 +32,7 @@ from style import appliquer_style, pastilles
 from guide import afficher_guide, rouvrir_guide
 from onglets import onglet_portefeuille, onglet_var_es, onglet_backtesting, onglet_stress_tests
 from export import creer_excel
+from version import version_moteur
 
 
 # =============================================================================
@@ -102,8 +104,12 @@ def reequilibrer_poids(ticker_modifie, tickers):
 # est gardé en mémoire. (Les calculs longs des onglets sont dans onglets.py.)
 # =============================================================================
 @st.cache_data(show_spinner="Téléchargement des prix…")
-def charger_prix(tickers, debut, fin):
-    """Cours convertis en euros, et devise de cotation de chaque titre."""
+def charger_prix(tickers, debut, fin, version):
+    """
+    Cours convertis en euros, et devise de cotation de chaque titre.
+    version : empreinte du moteur de calcul, qui renouvelle le cache après une
+    mise à jour du code (voir version.py).
+    """
     return telecharger_prix_euros(list(tickers), debut, fin)
 
 
@@ -203,7 +209,7 @@ with st.sidebar.expander("Paramètres avancés"):
 # 3. DONNÉES ET CALCULS
 # =============================================================================
 try:
-    prix, devises = charger_prix(tuple(tickers), debut, fin)
+    prix, devises = charger_prix(tuple(tickers), debut, fin, version_moteur())
 except ValueError as erreur:
     st.error(str(erreur))
     st.stop()

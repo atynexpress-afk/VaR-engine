@@ -18,6 +18,7 @@ from backtesting import (var_glissante, test_kupiec, test_christoffersen, test_a
                          stress_historiques, stress_hypothetique)
 from definitions import DEFINITIONS as D
 from formats import euros, pct, nombre, nombre_signe, p_value, colonne
+from version import version_moteur
 from style import (afficher, barre_exceptions, encadre, COULEURS, COULEUR_PORTEFEUILLE, COULEUR_PERTES,
                    COULEUR_EXCEPTION, ACCENT)
 
@@ -25,15 +26,18 @@ from style import (afficher, barre_exceptions, encadre, COULEURS, COULEUR_PORTEF
 # =============================================================================
 # CALCULS LONGS MIS EN CACHE
 # Streamlit relance tout le script à chaque clic : le cache garde en mémoire
-# le résultat tant que les paramètres ne changent pas.
+# le résultat tant que les paramètres ne changent pas. Le paramètre `version`
+# (empreinte du moteur, voir version.py) renouvelle le cache quand le code des
+# calculs change. Il faut le passer explicitement à chaque appel : Streamlit
+# ne tient pas compte des valeurs par défaut, ni des paramètres commençant par « _ ».
 # =============================================================================
 @st.cache_data(show_spinner="Backtesting en cours…")
-def lancer_backtest(r_ptf, alpha, fenetre, methode, ddl, lam):
+def lancer_backtest(r_ptf, alpha, fenetre, methode, ddl, lam, version):
     return var_glissante(r_ptf, alpha, fenetre, methode, ddl, lam)
 
 
 @st.cache_data(show_spinner="Téléchargement des crises historiques…")
-def lancer_stress(tickers, poids):
+def lancer_stress(tickers, poids, version):
     return stress_historiques(list(tickers), list(poids))
 
 
@@ -214,7 +218,7 @@ def onglet_backtesting(r_ptf, alpha, fenetre, ddl, lam):
         for code, nom in [("historique", "Historique"), ("normale", "Paramétrique normale"),
                           ("student", "Paramétrique Student"), ("ewma", "EWMA (RiskMetrics)"),
                           ("fhs", "Historique filtrée (FHS)")]:
-            bt = lancer_backtest(r_ptf, alpha, fenetre, code, ddl, lam)
+            bt = lancer_backtest(r_ptf, alpha, fenetre, code, ddl, lam, version_moteur())
             backtests[nom] = bt
             k = test_kupiec(bt["Exception"], alpha)
             c = test_christoffersen(bt["Exception"], alpha)
@@ -309,7 +313,7 @@ def onglet_stress_tests(tickers, noms_titres, poids, montant, res_1j):
     res_1j : VaR et ES à 1 jour de la méthode mise en avant
     Renvoie le tableau des crises historiques (pour l'export).
     """
-    stress = lancer_stress(tuple(tickers), tuple(float(p) for p in poids))
+    stress = lancer_stress(tuple(tickers), tuple(float(p) for p in poids), version_moteur())
     stress_aff = stress.copy()
     stress_aff["Perte (€)"] = stress_aff["Perte totale"] * montant
     disponibles = stress.dropna()

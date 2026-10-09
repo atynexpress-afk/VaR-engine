@@ -53,6 +53,7 @@ var-engine/
 ├── onglets.py          Contenu des quatre onglets (une fonction par onglet)
 ├── formats.py          Mise en forme des nombres à la française
 ├── export.py           Export des résultats en Excel
+├── version.py          Empreinte du moteur, pour renouveler le cache après une mise à jour
 ├── data.py             Téléchargement des prix, rendements, portefeuille
 ├── var_models.py       VaR et ES : historique, paramétrique, Monte Carlo, EWMA, FHS
 ├── backtesting.py      Kupiec, Christoffersen, Bâle, stress tests
@@ -79,7 +80,7 @@ streamlit run app.py
 
 ## Tests
 
-Le moteur de calcul est couvert par 49 tests automatiques, sur données simulées (sans connexion Internet) :
+Le moteur de calcul est couvert par 50 tests automatiques, sur données simulées (sans connexion Internet) :
 
 ```bash
 pip install -r requirements-dev.txt
