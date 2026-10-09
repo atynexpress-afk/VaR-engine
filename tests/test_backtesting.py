@@ -6,14 +6,15 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from backtesting import (var_glissante, test_kupiec, test_christoffersen, feux_bale,
-                         stress_sur_prix, stress_hypothetique)
+from backtesting import (var_glissante, test_kupiec, test_christoffersen, test_acerbi_szekely,
+                         feux_bale, stress_sur_prix, stress_hypothetique)
 from var_models import var_historique, var_parametrique
 
 # pytest exécute toute fonction dont le nom commence par « test_ » : on lui
 # signale que ces deux-là sont des fonctions du projet, pas des tests.
 test_kupiec.__test__ = False
 test_christoffersen.__test__ = False
+test_acerbi_szekely.__test__ = False
 
 
 # ---------------------------------------------------------------------------
@@ -60,6 +61,34 @@ def test_christoffersen_accepte_des_exceptions_dispersees():
 
 
 # ---------------------------------------------------------------------------
+# Backtest de l'Expected Shortfall (Acerbi et Szekely)
+# ---------------------------------------------------------------------------
+def backtest_fictif(n_exceptions, perte_sur_es, T=1_000):
+    """T jours, ES prévue de 3 %, n exceptions dont la perte vaut perte_sur_es x ES."""
+    bt = pd.DataFrame({"Perte": 0.0, "VaR": 0.02, "ES": 0.03, "Exception": False},
+                      index=range(T))
+    bt.loc[:n_exceptions - 1, "Perte"] = 0.03 * perte_sur_es
+    bt.loc[:n_exceptions - 1, "Exception"] = True
+    return bt
+
+
+def test_acerbi_szekely_modele_exact():
+    # 10 exceptions sur 1 000 jours à 99 %, chacune égale à l'ES prévue : Z2 = 0
+    res = test_acerbi_szekely(backtest_fictif(10, 1.0), 0.99)
+    assert res["Z2"] == pytest.approx(0)
+    assert res["Zone"] == "Verte"
+
+
+@pytest.mark.parametrize("n_exceptions, perte_sur_es, zone", [
+    (10, 2.0, "Orange"),          # bon nombre, mais pertes deux fois plus fortes : Z2 = -1
+    (30, 1.0, "Rouge"),           # trois fois trop d'exceptions : Z2 = -2
+    (5, 1.0, "Verte"),            # modèle prudent : Z2 = +0,5
+])
+def test_acerbi_szekely_zones(n_exceptions, perte_sur_es, zone):
+    assert test_acerbi_szekely(backtest_fictif(n_exceptions, perte_sur_es), 0.99)["Zone"] == zone
+
+
+# ---------------------------------------------------------------------------
 # Feux tricolores de Bâle : bornes des zones
 # ---------------------------------------------------------------------------
 @pytest.mark.parametrize("n_exceptions, zone", [(0, "Verte"), (4, "Verte"), (5, "Orange"),
@@ -93,21 +122,23 @@ def test_var_glissante_ne_regarde_pas_le_futur(rendements, methode):
     bt1 = var_glissante(rendements, 0.99, 250, methode)
     bt2 = var_glissante(modifie, 0.99, 250, methode)
     assert bt1["VaR"].iloc[-1] == pytest.approx(bt2["VaR"].iloc[-1])
+    assert bt1["ES"].iloc[-1] == pytest.approx(bt2["ES"].iloc[-1])
     assert bt2["Exception"].iloc[-1]                  # -50 % est bien une exception
 
 
 @pytest.mark.parametrize("methode, calcul_direct", [
-    ("historique", lambda passe: var_historique(passe, 0.99)["VaR"]),
-    ("normale", lambda passe: var_parametrique(passe, 0.99, "normale")["VaR"]),
-    ("student", lambda passe: var_parametrique(passe, 0.99, "student", 5)["VaR"]),
+    ("historique", lambda passe: var_historique(passe, 0.99)),
+    ("normale", lambda passe: var_parametrique(passe, 0.99, "normale")),
+    ("student", lambda passe: var_parametrique(passe, 0.99, "student", 5)),
 ])
 def test_var_glissante_egale_le_calcul_direct(rendements, methode, calcul_direct):
     # La version rapide (rolling) doit redonner, pour un jour pris au hasard,
-    # la VaR calculée directement sur les 250 jours qui le précèdent.
+    # la VaR et l'ES calculées directement sur les 250 jours qui le précèdent.
     bt = var_glissante(rendements, 0.99, 250, methode)
     t = 320
     attendu = calcul_direct(rendements.iloc[t - 250:t])
-    assert bt.loc[rendements.index[t], "VaR"] == pytest.approx(attendu, rel=1e-10)
+    assert bt.loc[rendements.index[t], "VaR"] == pytest.approx(attendu["VaR"], rel=1e-10)
+    assert bt.loc[rendements.index[t], "ES"] == pytest.approx(attendu["ES"], rel=1e-10)
 
 
 def test_var_glissante_refuse_une_fenetre_trop_longue(rendements):

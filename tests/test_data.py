@@ -75,3 +75,33 @@ def test_message_clair_si_yahoo_ne_repond_pas(monkeypatch):
     monkeypatch.setattr(data, "PAUSE", 0)
     with pytest.raises(ValueError, match="Yahoo Finance ne répond pas"):
         data.telecharger_prix(["A"], "2024-01-01")
+
+
+# ---------------------------------------------------------------------------
+# Conversion en euros
+# ---------------------------------------------------------------------------
+def test_conversion_en_euros():
+    index = pd.date_range("2024-01-01", periods=3)
+    prix = pd.DataFrame({"LVMH": [700.0, 710.0, 720.0],      # déjà en euros
+                         "AAPL": [110.0, 110.0, 110.0],      # en dollars
+                         "HSBC": [600.0, 600.0, 600.0]},     # en pence
+                        index=index)
+    taux = pd.DataFrame({"USD": [1.10, 1.00, np.nan],        # taux manquant le 3e jour
+                         "GBP": [0.80, 0.80, 0.80]}, index=index)
+    devises = {"LVMH": "EUR", "AAPL": "USD", "HSBC": "GBp"}
+
+    en_euros = data.convertir_en_euros(prix, devises, taux)
+    assert en_euros["LVMH"].tolist() == [700.0, 710.0, 720.0]            # inchangé
+    assert en_euros["AAPL"].tolist() == pytest.approx([100.0, 110.0, 110.0])
+    # 600 pence = 6 livres = 6 / 0,80 = 7,50 €
+    assert en_euros["HSBC"].tolist() == pytest.approx([7.5, 7.5, 7.5])
+
+
+def test_baisse_du_dollar_visible_en_euros():
+    # Cours en dollars stable, mais l'euro passe de 1,00 à 1,10 dollar :
+    # l'investisseur européen perd 1 / 1,10 - 1 = -9,1 %
+    index = pd.date_range("2024-01-01", periods=2)
+    prix = pd.DataFrame({"AAPL": [100.0, 100.0]}, index=index)
+    taux = pd.DataFrame({"USD": [1.00, 1.10]}, index=index)
+    rendement = calculer_rendements(data.convertir_en_euros(prix, {"AAPL": "USD"}, taux))
+    assert rendement["AAPL"].iloc[0] == pytest.approx(1 / 1.10 - 1)

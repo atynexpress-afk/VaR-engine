@@ -21,6 +21,11 @@ def nombre(x, decimales=1):
     return f"{x:.{decimales}f}".replace(".", ",")
 
 
+def nombre_signe(x, decimales=2):
+    """Nombre avec son signe et le vrai signe moins : -0.664 -> '−0,66', 0.5 -> '+0,50'."""
+    return f"{x:+.{decimales}f}".replace(".", ",").replace("-", "−")
+
+
 def p_value(x):
     """Formate une p-value : les valeurs minuscules s'affichent '< 0,001' plutôt que '0'."""
     return "< 0,001" if x < 0.001 else nombre(x, 3)

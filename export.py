@@ -53,7 +53,8 @@ def creer_excel(parametres, var_es, tests=None, stress=None):
             tests.rename_axis("Méthode").to_excel(excel, sheet_name="Backtesting")
             _formater(excel.sheets["Backtesting"], {"Exceptions attendues": "0.0",
                                                     "p-value Kupiec": FORMAT_DECIMAL,
-                                                    "p-value Christoffersen": FORMAT_DECIMAL})
+                                                    "p-value Christoffersen": FORMAT_DECIMAL,
+                                                    "Z2 (Acerbi-Szekely)": "0.00"})
         if stress is not None:
             stress.rename_axis("Scénario").to_excel(excel, sheet_name="Stress tests")
             _formater(excel.sheets["Stress tests"], {"Perte totale": FORMAT_POURCENT,

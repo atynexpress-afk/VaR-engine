@@ -13,10 +13,11 @@ import plotly.graph_objects as go
 import streamlit as st
 from scipy import stats
 
-from backtesting import (var_glissante, test_kupiec, test_christoffersen, feux_bale,
+from backtesting import (var_glissante, test_kupiec, test_christoffersen, test_acerbi_szekely,
+                         feux_bale,
                          stress_historiques, stress_hypothetique)
 from definitions import DEFINITIONS as D
-from formats import euros, pct, nombre, p_value, colonne
+from formats import euros, pct, nombre, nombre_signe, p_value, colonne
 from style import (afficher, barre_exceptions, encadre, COULEURS, COULEUR_PORTEFEUILLE, COULEUR_PERTES,
                    COULEUR_EXCEPTION, ACCENT)
 
@@ -207,6 +208,7 @@ def onglet_backtesting(r_ptf, alpha, fenetre, ddl, lam):
         return None
     else:
         lignes = {}
+        lignes_es = {}
         backtests = {}
         raisons = {}
         for code, nom in [("historique", "Historique"), ("normale", "Paramétrique normale"),
@@ -227,6 +229,8 @@ def onglet_backtesting(r_ptf, alpha, fenetre, ddl, lam):
                 "Verdict (5 %)": "Rejeté" if rejete else "Accepté",
                 "Zone Bâle (250 j)": f"{f['Zone']} ({f['Exceptions sur 250 jours']})",
             }
+            a = test_acerbi_szekely(bt, alpha)
+            lignes_es[nom] = {"Z2 (Acerbi-Szekely)": a["Z2"], "Zone ES": a["Zone"]}
 
         with st.container(key="carte_tests"):
             st.subheader(f"Tests de validation · VaR {pct(alpha, 1)} à 1 jour, fenêtre de {fenetre} j",
@@ -244,6 +248,25 @@ def onglet_backtesting(r_ptf, alpha, fenetre, ddl, lam):
                 "Verdict (5 %)": colonne(D["verdict"]),
                 "Zone Bâle (250 j)": colonne(D["bale"]),
             })
+
+        with st.container(key="carte_tests_es"):
+            st.subheader(f"Backtest de l'Expected Shortfall · ES {pct(alpha, 1)} à 1 jour",
+                         help=D["acerbi_szekely"])
+            col_tableau, col_texte = st.columns([1, 1.2], vertical_alignment="center")
+            col_tableau.dataframe(
+                pd.DataFrame(lignes_es).T.style.format({"Z2 (Acerbi-Szekely)": nombre_signe}),
+                column_config={"Z2 (Acerbi-Szekely)": colonne(D["acerbi_szekely"]),
+                               "Zone ES": colonne(D["acerbi_szekely"])})
+            sous_estimees = [nom for nom, l in lignes_es.items() if l["Zone ES"] != "Verte"]
+            col_texte.markdown(
+                "Le test de Kupiec compte les dépassements de la VaR ; celui-ci vérifie aussi "
+                "leur **ampleur** : les jours de dépassement, la perte est-elle en moyenne égale "
+                "à l'ES prévue ? **Z2 proche de 0** : ES fiable. **Z2 sous −0,70** : les pertes "
+                "extrêmes sont plus fortes que prévu.")
+            if sous_estimees:
+                col_texte.markdown(f"ES sous-estimée par : **{', '.join(sous_estimees)}**. "
+                                   "Les jours de crise, leurs pertes dépassent nettement "
+                                   "l'ES qu'ils avaient prévue.")
 
         col_g, col_d = st.columns([1, 2.3])
         with col_g.container(key="carte_bale"):
@@ -267,11 +290,14 @@ def onglet_backtesting(r_ptf, alpha, fenetre, ddl, lam):
             fig.add_trace(go.Scatter(x=bt.index, y=bt["VaR"], name=f"VaR {pct(alpha, 1)}",
                                      mode="lines", line=dict(color=ACCENT, width=2.5),
                                      fill="tozeroy", fillcolor="rgba(91, 108, 240, 0.08)"))
+            fig.add_trace(go.Scatter(x=bt.index, y=bt["ES"], name=f"ES {pct(alpha, 1)}",
+                                     mode="lines", line=dict(color=COULEURS[6], width=1.5,
+                                                             dash="dot")))
             fig.add_trace(go.Scatter(x=exc.index, y=exc["Perte"], name="Exception", mode="markers",
                                      marker=dict(color=COULEUR_EXCEPTION, size=9, symbol="x")))
             fig.update_layout(height=360, hovermode="x unified", yaxis_tickformat=".1%")
             afficher(fig)
-        return pd.DataFrame(lignes).T
+        return pd.concat([pd.DataFrame(lignes).T, pd.DataFrame(lignes_es).T], axis=1)
 
 
 # =============================================================================

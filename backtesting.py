@@ -15,7 +15,7 @@ import pandas as pd
 from scipy import stats
 from scipy.special import xlogy
 
-from data import normaliser_poids, telecharger_prix
+from data import normaliser_poids, telecharger_prix_euros
 from var_models import volatilite_ewma, LAMBDA_RISKMETRICS
 
 
@@ -33,7 +33,7 @@ def var_glissante(r_ptf, alpha=0.99, fenetre=250, methode="historique", ddl=5,
     toute la série : sigma[t] n'utilise que les rendements jusqu'à t-1,
     il n'y a donc pas de regard vers le futur.
     Renvoie un DataFrame avec une ligne par jour :
-      Perte, VaR, Exception (True si la perte a dépassé la VaR)
+      Perte, VaR, ES (prévus la veille), Exception (True si la perte a dépassé la VaR)
     """
     r_ptf = pd.Series(r_ptf)
     if len(r_ptf) <= fenetre:
@@ -45,29 +45,42 @@ def var_glissante(r_ptf, alpha=0.99, fenetre=250, methode="historique", ddl=5,
     def glissant(serie):
         return serie.rolling(fenetre)
 
+    def es_empirique(pertes):
+        """ES historique d'une fenêtre : moyenne des pertes au-delà de leur quantile."""
+        return pertes[pertes >= np.quantile(pertes, alpha)].mean()
+
     if methode == "historique":
         var = glissant(-r_ptf).quantile(alpha).shift(1)
+        es = glissant(-r_ptf).apply(es_empirique, raw=True).shift(1)
     elif methode in ("normale", "student"):
         mu = glissant(r_ptf).mean().shift(1)
         sigma = glissant(r_ptf).std().shift(1)          # écart-type sans biais (ddof=1)
         if methode == "normale":
-            var = -mu + sigma * stats.norm.ppf(alpha)
+            z = stats.norm.ppf(alpha)
+            var = -mu + sigma * z
+            es = -mu + sigma * stats.norm.pdf(z) / (1 - alpha)
         else:
             if ddl <= 2:
                 raise ValueError("Il faut ddl > 2 pour que la variance existe.")
-            var = -mu + sigma * np.sqrt((ddl - 2) / ddl) * stats.t.ppf(alpha, ddl)
+            echelle = sigma * np.sqrt((ddl - 2) / ddl)
+            t = stats.t.ppf(alpha, ddl)
+            var = -mu + echelle * t
+            es = -mu + echelle * stats.t.pdf(t, ddl) / (1 - alpha) * (ddl + t ** 2) / (ddl - 1)
     elif methode in ("ewma", "fhs"):
         sigma = pd.Series(volatilite_ewma(r_ptf, lam)[:-1], index=r_ptf.index)
         if methode == "ewma":
-            var = sigma * stats.norm.ppf(alpha)
+            z = stats.norm.ppf(alpha)
+            var = sigma * z
+            es = sigma * stats.norm.pdf(z) / (1 - alpha)
         else:
             chocs = r_ptf / sigma                         # rendements standardisés
             var = sigma * glissant(-chocs).quantile(alpha).shift(1)
+            es = sigma * glissant(-chocs).apply(es_empirique, raw=True).shift(1)
     else:
         raise ValueError("methode doit valoir 'historique', 'normale', 'student', "
                          "'ewma' ou 'fhs'")
 
-    resultat = pd.DataFrame({"Perte": -r_ptf, "VaR": var}).iloc[fenetre:]
+    resultat = pd.DataFrame({"Perte": -r_ptf, "VaR": var, "ES": es}).iloc[fenetre:]
     resultat["Exception"] = resultat["Perte"] > resultat["VaR"]
     return resultat
 
@@ -158,7 +171,39 @@ def test_christoffersen(exceptions, alpha=0.99):
 
 
 # ---------------------------------------------------------------------------
-# 4. FEUX TRICOLORES DE BÂLE
+# 4. BACKTEST DE L'EXPECTED SHORTFALL (Acerbi et Szekely, 2014)
+# ---------------------------------------------------------------------------
+SEUILS_ACERBI_SZEKELY = {"Orange": -0.70, "Rouge": -1.80}   # risque 5 % et 0,01 %
+
+
+def test_acerbi_szekely(bt, alpha=0.99):
+    """
+    Question : quand la VaR est dépassée, la perte est-elle en moyenne égale à l'ES prévue ?
+    Le test de Kupiec compte les dépassements ; celui-ci mesure aussi leur AMPLEUR.
+
+    Statistique Z2 (« test 2 » d'Acerbi et Szekely) :
+        Z2 = 1 - somme( Perte_t / ES_t  sur les jours d'exception ) / (T x (1 - alpha))
+    Si le modèle est juste, Z2 vaut 0 en moyenne. Z2 négatif : les pertes extrêmes
+    sont plus fortes ou plus fréquentes que prévu, l'ES sous-estime le risque.
+    Seuils publiés par les auteurs, très stables d'une loi à l'autre :
+      Z2 > -0,70 : zone verte ; -1,80 < Z2 <= -0,70 : orange ; Z2 <= -1,80 : rouge.
+
+    bt : résultat de var_glissante (colonnes Perte, ES, Exception)
+    """
+    T = len(bt)
+    exceptions = bt[bt["Exception"]]
+    z2 = 1 - (exceptions["Perte"] / exceptions["ES"]).sum() / (T * (1 - alpha))
+    if z2 > SEUILS_ACERBI_SZEKELY["Orange"]:
+        zone = "Verte"
+    elif z2 > SEUILS_ACERBI_SZEKELY["Rouge"]:
+        zone = "Orange"
+    else:
+        zone = "Rouge"
+    return {"Z2": z2, "Zone": zone, "Modèle rejeté (5 %)": zone != "Verte"}
+
+
+# ---------------------------------------------------------------------------
+# 5. FEUX TRICOLORES DE BÂLE
 # ---------------------------------------------------------------------------
 def feux_bale(exceptions):
     """
@@ -179,7 +224,7 @@ def feux_bale(exceptions):
 
 
 # ---------------------------------------------------------------------------
-# 5. STRESS TESTS
+# 6. STRESS TESTS
 # ---------------------------------------------------------------------------
 # Crises historiques : (date de début, date de fin)
 SCENARIOS_HISTORIQUES = {
@@ -215,7 +260,7 @@ def stress_historiques(tickers, poids, scenarios=SCENARIOS_HISTORIQUES):
     lignes = {}
     for nom, (debut, fin) in scenarios.items():
         try:
-            prix = telecharger_prix(tickers, debut=debut, fin=fin, tentatives=1)
+            prix, _ = telecharger_prix_euros(tickers, debut=debut, fin=fin, tentatives=1)
             lignes[nom] = stress_sur_prix(prix, poids)
         except ValueError:
             lignes[nom] = {"Perte totale": np.nan, "Pire journée": np.nan}
@@ -243,7 +288,7 @@ if __name__ == "__main__":
     tickers = ["MC.PA", "AIR.PA", "TTE.PA"]
     poids = [0.4, 0.3, 0.3]
 
-    prix = telecharger_prix(tickers, debut="2018-01-01")
+    prix, _ = telecharger_prix_euros(tickers, debut="2018-01-01")
     r_ptf = rendements_portefeuille(calculer_rendements(prix), poids)
 
     for methode in ["historique", "normale", "student", "ewma", "fhs"]:

@@ -5,6 +5,7 @@ Il ne fait AUCUN calcul de risque : il prépare seulement les données.
 """
 
 import time
+from functools import lru_cache
 
 import numpy as np
 import pandas as pd
@@ -72,6 +73,77 @@ def telecharger_prix(tickers, debut, fin=None, tentatives=TENTATIVES):
     prix = prix[tickers]    # on remet les colonnes dans l'ordre demandé
     prix = prix.dropna()    # on enlève les jours où une action n'a pas coté
     return prix
+
+
+# ---------------------------------------------------------------------------
+# CONVERSION EN EUROS
+# Un portefeuille en euros qui contient Apple (cotée en dollars) est exposé au
+# risque de change : si le dollar baisse, l'action perd de la valeur en euros
+# même si son cours en dollars ne bouge pas. On convertit donc chaque cours en
+# euros, jour par jour, avant de calculer les rendements.
+# ---------------------------------------------------------------------------
+# Certaines places cotent en centièmes de devise (Londres : pence, « GBp »)
+SOUS_UNITES = {"GBp": ("GBP", 100), "GBX": ("GBP", 100), "ZAc": ("ZAR", 100),
+               "ILA": ("ILS", 100)}
+
+
+@lru_cache(maxsize=None)
+def devise(ticker):
+    """
+    Devise de cotation d'un titre, ex. 'AAPL' -> 'USD', 'MC.PA' -> 'EUR'.
+    lru_cache garde la réponse en mémoire : Yahoo n'est interrogé qu'une fois par titre.
+    En cas d'échec, on suppose l'euro.
+    """
+    try:
+        return yf.Ticker(ticker).fast_info["currency"] or "EUR"
+    except Exception:
+        return "EUR"
+
+
+def convertir_en_euros(prix, devises, taux):
+    """
+    Convertit chaque colonne de prix en euros.
+
+    prix    : DataFrame des cours (une colonne par titre)
+    devises : {titre: devise de cotation}, ex. {"AAPL": "USD"}
+    taux    : DataFrame des taux de change, une colonne par devise, exprimés en
+              unités de devise pour 1 euro (ex. colonne "USD" = 1,10 dollar pour 1 €)
+    Prix en euros = prix en devise / taux du même jour.
+    """
+    en_euros = prix.copy()
+    for titre, dev in devises.items():
+        diviseur = 1
+        if dev in SOUS_UNITES:                     # pence -> livres, etc.
+            dev, diviseur = SOUS_UNITES[dev]
+        if dev == "EUR":
+            continue
+        # Le change cote presque tous les jours : on reprend le dernier taux connu
+        # pour les jours où il manquerait (ffill = « forward fill »).
+        taux_du_jour = taux[dev].reindex(prix.index).ffill()
+        en_euros[titre] = prix[titre] / diviseur / taux_du_jour
+    return en_euros.dropna()
+
+
+def telecharger_prix_euros(tickers, debut, fin=None, tentatives=TENTATIVES):
+    """
+    Comme telecharger_prix, mais avec des cours convertis en euros.
+    Renvoie aussi les devises d'origine : (prix en euros, {titre: devise}).
+    """
+    prix = telecharger_prix(tickers, debut, fin, tentatives)
+    devises = {t: devise(t) for t in tickers}
+    a_convertir = sorted({SOUS_UNITES.get(d, (d, 1))[0] for d in devises.values()} - {"EUR"})
+    if len(a_convertir) == 0:
+        return prix, devises
+
+    paires = [f"EUR{d}=X" for d in a_convertir]          # ex. EURUSD=X : dollars pour 1 €
+    taux = _telecharger(paires, debut, fin, tentatives)
+    if taux is None:
+        raise ValueError("Impossible de récupérer les taux de change pour convertir en euros : "
+                         f"{', '.join(paires)}. Réessaie dans quelques minutes.")
+    if isinstance(taux, pd.Series):
+        taux = taux.to_frame(name=paires[0])
+    taux = taux.rename(columns=lambda paire: paire[3:6])  # "EURUSD=X" -> "USD"
+    return convertir_en_euros(prix, devises, taux), devises
 
 
 def calculer_rendements(prix, methode="simple"):

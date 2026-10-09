@@ -11,9 +11,10 @@ Projet réalisé dans le cadre du Master 2 Ingénierie des risques économiques 
 ## Fonctionnalités
 
 - **Portefeuille paramétrable** : actions du CAC 40 ou tout ticker Yahoo Finance, poids rééquilibrés automatiquement, période et montant au choix.
+- **Conversion en euros** : les titres cotés dans une autre devise (dollar, livre, franc suisse…) sont convertis au taux de change de chaque jour, ce qui intègre le risque de change dans la VaR.
 - **Six méthodes de VaR et d'ES** : historique, paramétrique (loi normale et loi de Student), Monte Carlo avec corrélations, EWMA (RiskMetrics) et historique filtrée (FHS).
 - **Tous les paramètres modifiables** : niveau de confiance, horizon, degrés de liberté, nombre de simulations, graine aléatoire, facteur de lissage λ, fenêtre d'estimation.
-- **Backtesting** : VaR glissante hors échantillon, tests de Kupiec et de Christoffersen, feux tricolores de Bâle, et conclusion en langage clair (quel modèle passe les tests, et pourquoi les autres échouent).
+- **Backtesting** : VaR et ES glissantes hors échantillon, tests de Kupiec et de Christoffersen, backtest de l'ES d'Acerbi et Szekely, feux tricolores de Bâle, et conclusion en langage clair (quel modèle passe les tests, et pourquoi les autres échouent).
 - **Stress tests** : crises historiques (Lehman 2008, dette européenne 2011, Covid 2020, Ukraine 2022) et chocs hypothétiques définis par l'utilisateur.
 - **Diagnostic des queues de distribution** : histogramme comparé à la loi normale, QQ-plot, skewness et kurtosis.
 - **Graphiques interactifs** et définition de chaque notion accessible depuis l'interface.
@@ -40,6 +41,7 @@ Projet réalisé dans le cadre du Master 2 Ingénierie des risques économiques 
 
 - **Test de Kupiec** (couverture non conditionnelle) : le nombre d'exceptions est-il compatible avec le niveau de confiance ? Rapport de vraisemblance, χ²(1).
 - **Test de Christoffersen** (couverture conditionnelle) : les exceptions sont-elles indépendantes dans le temps ? χ²(2).
+- **Test d'Acerbi et Szekely** (backtest de l'Expected Shortfall) : les jours de dépassement, la perte est-elle en moyenne égale à l'ES prévue ? Statistique Z₂ = 1 − Σ (Lₜ / ESₜ)·𝟙{Lₜ > VaRₜ} / (T·(1−α)), zones verte (> −0,70), orange et rouge (≤ −1,80).
 - **Feux tricolores de Bâle** : zones verte, orange et rouge selon le nombre d'exceptions sur 250 jours.
 - Les formules ont été vérifiées par simulation : sur des données gaussiennes, les trois méthodes retrouvent la VaR théorique à moins de 1 % près.
 
@@ -77,14 +79,14 @@ streamlit run app.py
 
 ## Tests
 
-Le moteur de calcul est couvert par 43 tests automatiques, sur données simulées (sans connexion Internet) :
+Le moteur de calcul est couvert par 49 tests automatiques, sur données simulées (sans connexion Internet) :
 
 ```bash
 pip install -r requirements-dev.txt
 python -m pytest
 ```
 
-Ils vérifient notamment les formules fermées de la VaR et de l'ES normales, la convergence du Monte Carlo, la récurrence EWMA, la statistique de Kupiec sur le cas de référence de Jorion (10 exceptions sur 250 jours : LR = 12,96), la détection des grappes d'exceptions par Christoffersen, les bornes des zones de Bâle, l'absence de regard vers le futur dans le backtesting, l'équivalence entre le backtesting vectorisé et le calcul direct, la reprise après une panne de Yahoo Finance et l'export Excel.
+Ils vérifient notamment les formules fermées de la VaR et de l'ES normales, la convergence du Monte Carlo, la récurrence EWMA, la statistique de Kupiec sur le cas de référence de Jorion (10 exceptions sur 250 jours : LR = 12,96), la détection des grappes d'exceptions par Christoffersen, les bornes des zones de Bâle, l'absence de regard vers le futur dans le backtesting, l'équivalence entre le backtesting vectorisé et le calcul direct, les zones du test d'Acerbi et Szekely, la conversion en euros (dont les cours en pence de Londres), la reprise après une panne de Yahoo Finance et l'export Excel.
 
 Le backtesting est vectorisé avec les fenêtres glissantes de pandas (`rolling`) : 259 fois plus rapide qu'une boucle jour par jour, pour des résultats identiques.
 
@@ -94,8 +96,9 @@ Le backtesting est vectorisé avec les fenêtres glissantes de pandas (`rolling`
 - Les méthodes historique et paramétrique sur fenêtre fixe réagissent lentement aux changements de régime, ce que le test de Christoffersen met souvent en évidence. Les modèles EWMA et FHS corrigent ce point.
 - Le Monte Carlo repose sur une hypothèse gaussienne multivariée.
 - Les données proviennent de Yahoo Finance et ne sont pas contrôlées comme des données de production.
+- Pour des titres cotés sur plusieurs places, seuls les jours ouvrés communs sont conservés : un rendement peut alors couvrir deux jours de bourse.
 
-**Pistes d'amélioration :** volatilité GARCH, copules pour la dépendance, théorie des valeurs extrêmes, backtesting de l'Expected Shortfall.
+**Pistes d'amélioration :** volatilité GARCH, copules pour la dépendance, théorie des valeurs extrêmes.
 
 ## Technologies
 

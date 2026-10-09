@@ -11,7 +11,9 @@ DEFINITIONS = {
                "(dividendes et divisions d'actions) sont téléchargés depuis Yahoo Finance.",
     "tickers": "Code d'identification d'un titre sur Yahoo Finance. Exemples : AAPL (Apple), "
                "MSFT (Microsoft), ^FCHI (indice CAC 40). Les actions cotées à Paris se "
-               "terminent par .PA.",
+               "terminent par .PA. Les titres cotés dans une autre devise (dollar, livre…) "
+               "sont convertis en euros au taux de change de chaque jour : le risque de "
+               "change est ainsi inclus dans la VaR.",
     "poids": "Part de la valeur du portefeuille investie dans chaque titre. Quand un poids est "
              "modifié, les autres s'ajustent en gardant leurs proportions, pour que le total "
              "reste égal à 100 %. Les poids sont positifs : la vente à découvert n'est pas "
@@ -39,6 +41,11 @@ DEFINITIONS = {
                "**Historique filtrée (FHS)** : les pertes passées sont remises à l'échelle de la "
                "volatilité EWMA actuelle. Elle combine les queues épaisses de la méthode "
                "historique et la réactivité de l'EWMA.",
+    "acerbi_szekely": "Test d'Acerbi et Szekely (2014) pour l'Expected Shortfall : "
+                      "Z2 = 1 − Σ (perte / ES prévue, les jours où la VaR est dépassée) "
+                      "/ (T × (1 − α)). Un modèle juste donne Z2 ≈ 0. Zone verte au-dessus de "
+                      "−0,70, orange jusqu'à −1,80 (rejet à 5 %), rouge en dessous (rejet à "
+                      "0,01 %). FRTB a fait de l'ES à 97,5 % la mesure réglementaire.",
     "export": "Fichier Excel avec une feuille par thème : paramètres utilisés, VaR et ES de "
               "chaque méthode, tests de backtesting et stress tests historiques. Les valeurs "
               "restent des nombres, pour pouvoir refaire des calculs dans Excel.",

@@ -21,7 +21,8 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-from data import telecharger_prix, calculer_rendements, rendements_portefeuille, normaliser_poids
+from data import (telecharger_prix_euros, calculer_rendements, rendements_portefeuille,
+                  normaliser_poids, SOUS_UNITES)
 from var_models import (var_historique, var_parametrique, var_monte_carlo, var_ewma,
                         var_historique_filtree, changer_horizon, LAMBDA_RISKMETRICS)
 from definitions import DEFINITIONS as D      # D["var"] renvoie la définition de la VaR
@@ -102,7 +103,8 @@ def reequilibrer_poids(ticker_modifie, tickers):
 # =============================================================================
 @st.cache_data(show_spinner="Téléchargement des prix…")
 def charger_prix(tickers, debut, fin):
-    return telecharger_prix(list(tickers), debut, fin)
+    """Cours convertis en euros, et devise de cotation de chaque titre."""
+    return telecharger_prix_euros(list(tickers), debut, fin)
 
 
 
@@ -201,7 +203,7 @@ with st.sidebar.expander("Paramètres avancés"):
 # 3. DONNÉES ET CALCULS
 # =============================================================================
 try:
-    prix = charger_prix(tuple(tickers), debut, fin)
+    prix, devises = charger_prix(tuple(tickers), debut, fin)
 except ValueError as erreur:
     st.error(str(erreur))
     st.stop()
@@ -245,6 +247,9 @@ principal = resultats[methode_principale]
 st.title("Mesure du risque de marché")
 st.markdown('<p class="sous-titre">VaR et Expected Shortfall par six méthodes, '
             'backtesting réglementaire et stress tests.</p>', unsafe_allow_html=True)
+# Titres cotés dans une autre devise que l'euro (convertis jour par jour)
+# (les pence « GBp » s'affichent comme des livres « GBP »)
+devises_etrangeres = sorted({SOUS_UNITES.get(d, (d, 1))[0] for d in devises.values()} - {"EUR"})
 pastilles([
     ("Méthode", methode_principale),
     ("Confiance", pct(alpha, 1)),
@@ -252,7 +257,7 @@ pastilles([
     ("Titres", len(tickers)),
     ("Période", f"{debut:%d/%m/%Y} → {fin:%d/%m/%Y}"),
     ("Portefeuille", euros(montant)),
-])
+] + ([("Convertis en euros", ", ".join(devises_etrangeres))] if devises_etrangeres else []))
 
 c1, c2, c3, c4 = st.columns(4)
 # delta = petite pastille sous la valeur ; delta_color="off" et delta_arrow="off"
