@@ -4,12 +4,37 @@ Module chargé de récupérer les données de marché et de construire le portef
 Il ne fait AUCUN calcul de risque : il prépare seulement les données.
 """
 
+import time
+
 import numpy as np
 import pandas as pd
 import yfinance as yf
 
+TENTATIVES = 3          # nombre d'essais si Yahoo Finance ne répond pas
+PAUSE = 2               # secondes d'attente entre deux essais (doublées à chaque fois)
 
-def telecharger_prix(tickers, debut, fin=None):
+
+def _telecharger(tickers, debut, fin, tentatives=TENTATIVES):
+    """
+    Appelle Yahoo Finance, en réessayant si le service ne répond pas.
+    Sur un serveur partagé comme Streamlit Cloud, Yahoo limite parfois le nombre
+    de requêtes : un nouvel essai quelques secondes plus tard suffit souvent.
+    Renvoie les prix de clôture, ou None si tous les essais ont échoué.
+    """
+    for essai in range(tentatives):
+        try:
+            donnees = yf.download(tickers, start=debut, end=fin,
+                                  auto_adjust=True, progress=False)
+            if len(donnees) > 0:
+                return donnees["Close"]
+        except Exception:               # coupure réseau, limite de requêtes…
+            pass
+        if essai < tentatives - 1:
+            time.sleep(PAUSE * 2 ** essai)
+    return None
+
+
+def telecharger_prix(tickers, debut, fin=None, tentatives=TENTATIVES):
     """
     Télécharge les prix de clôture ajustés d'une liste d'actions.
 
@@ -18,14 +43,17 @@ def telecharger_prix(tickers, debut, fin=None):
     tickers : liste de textes, ex. ["MC.PA", "AIR.PA"]
     debut   : date de début, ex. "2020-01-01"
     fin     : date de fin (None = jusqu'à aujourd'hui)
+    tentatives : nombre d'essais si Yahoo Finance ne renvoie rien
 
     Renvoie
     -------
     Un tableau (DataFrame) : une colonne par action, une ligne par jour.
     """
-    donnees = yf.download(tickers, start=debut, end=fin,
-                          auto_adjust=True, progress=False)
-    prix = donnees["Close"]
+    prix = _telecharger(tickers, debut, fin, tentatives)
+    if prix is None:
+        raise ValueError("Yahoo Finance ne répond pas pour le moment (service indisponible ou "
+                         "trop de requêtes). Réessaie dans quelques minutes, ou vérifie les "
+                         f"codes des actions : {', '.join(tickers)}.")
 
     # Si une seule action est demandée, yfinance peut renvoyer une Series :
     # on la transforme en tableau à une colonne pour toujours avoir le même format.
@@ -38,7 +66,8 @@ def telecharger_prix(tickers, debut, fin=None):
         if t not in prix.columns or prix[t].isna().all():
             manquants.append(t)
     if len(manquants) > 0:
-        raise ValueError(f"Aucune donnée trouvée pour : {manquants}")
+        raise ValueError(f"Aucune donnée trouvée pour : {', '.join(manquants)}. "
+                         "Vérifie le code de l'action sur finance.yahoo.com.")
 
     prix = prix[tickers]    # on remet les colonnes dans l'ordre demandé
     prix = prix.dropna()    # on enlève les jours où une action n'a pas coté

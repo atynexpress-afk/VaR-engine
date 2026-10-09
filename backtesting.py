@@ -16,7 +16,7 @@ from scipy import stats
 from scipy.special import xlogy
 
 from data import normaliser_poids, telecharger_prix
-from var_models import var_historique, var_parametrique, volatilite_ewma, LAMBDA_RISKMETRICS
+from var_models import volatilite_ewma, LAMBDA_RISKMETRICS
 
 
 # ---------------------------------------------------------------------------
@@ -39,33 +39,37 @@ def var_glissante(r_ptf, alpha=0.99, fenetre=250, methode="historique", ddl=5,
     if len(r_ptf) <= fenetre:
         raise ValueError("Pas assez de données : il faut plus de jours que la taille de la fenêtre.")
 
-    if methode in ("ewma", "fhs"):
-        sigma = volatilite_ewma(r_ptf, lam)
-        chocs = r_ptf.values / sigma[:-1]           # rendements standardisés
+    # rolling(fenetre) calcule une statistique sur les `fenetre` derniers jours,
+    # pour tous les jours d'un coup (bien plus rapide qu'une boucle Python).
+    # shift(1) décale d'un jour : la VaR du jour t n'utilise que les jours jusqu'à t-1.
+    def glissant(serie):
+        return serie.rolling(fenetre)
 
-    dates, vars_ = [], []
-    for t in range(fenetre, len(r_ptf)):
-        passe = r_ptf.iloc[t - fenetre:t]          # les jours AVANT t uniquement
-        if methode == "historique":
-            res = var_historique(passe, alpha)
-        elif methode == "normale":
-            res = var_parametrique(passe, alpha, "normale")
-        elif methode == "student":
-            res = var_parametrique(passe, alpha, "student", ddl)
-        elif methode == "ewma":
-            res = {"VaR": sigma[t] * stats.norm.ppf(alpha)}
-        elif methode == "fhs":
-            res = {"VaR": sigma[t] * var_historique(chocs[t - fenetre:t], alpha)["VaR"]}
+    if methode == "historique":
+        var = glissant(-r_ptf).quantile(alpha).shift(1)
+    elif methode in ("normale", "student"):
+        mu = glissant(r_ptf).mean().shift(1)
+        sigma = glissant(r_ptf).std().shift(1)          # écart-type sans biais (ddof=1)
+        if methode == "normale":
+            var = -mu + sigma * stats.norm.ppf(alpha)
         else:
-            raise ValueError("methode doit valoir 'historique', 'normale', 'student', "
-                             "'ewma' ou 'fhs'")
-        dates.append(r_ptf.index[t])
-        vars_.append(res["VaR"])
+            if ddl <= 2:
+                raise ValueError("Il faut ddl > 2 pour que la variance existe.")
+            var = -mu + sigma * np.sqrt((ddl - 2) / ddl) * stats.t.ppf(alpha, ddl)
+    elif methode in ("ewma", "fhs"):
+        sigma = pd.Series(volatilite_ewma(r_ptf, lam)[:-1], index=r_ptf.index)
+        if methode == "ewma":
+            var = sigma * stats.norm.ppf(alpha)
+        else:
+            chocs = r_ptf / sigma                         # rendements standardisés
+            var = sigma * glissant(-chocs).quantile(alpha).shift(1)
+    else:
+        raise ValueError("methode doit valoir 'historique', 'normale', 'student', "
+                         "'ewma' ou 'fhs'")
 
-    resultat = pd.DataFrame({"VaR": vars_}, index=dates)
-    resultat["Perte"] = -r_ptf.iloc[fenetre:].values
+    resultat = pd.DataFrame({"Perte": -r_ptf, "VaR": var}).iloc[fenetre:]
     resultat["Exception"] = resultat["Perte"] > resultat["VaR"]
-    return resultat[["Perte", "VaR", "Exception"]]
+    return resultat
 
 
 # ---------------------------------------------------------------------------
@@ -205,11 +209,13 @@ def stress_historiques(tickers, poids, scenarios=SCENARIOS_HISTORIQUES):
     """
     Applique au portefeuille actuel chaque crise historique.
     Si une action n'existait pas encore à l'époque, le scénario est ignoré.
+    Un seul essai de téléchargement : une absence de données est ici normale
+    (action pas encore cotée), inutile d'attendre pour réessayer.
     """
     lignes = {}
     for nom, (debut, fin) in scenarios.items():
         try:
-            prix = telecharger_prix(tickers, debut=debut, fin=fin)
+            prix = telecharger_prix(tickers, debut=debut, fin=fin, tentatives=1)
             lignes[nom] = stress_sur_prix(prix, poids)
         except ValueError:
             lignes[nom] = {"Perte totale": np.nan, "Pire journée": np.nan}

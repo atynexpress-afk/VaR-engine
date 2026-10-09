@@ -8,6 +8,7 @@ import pytest
 
 from backtesting import (var_glissante, test_kupiec, test_christoffersen, feux_bale,
                          stress_sur_prix, stress_hypothetique)
+from var_models import var_historique, var_parametrique
 
 # pytest exécute toute fonction dont le nom commence par « test_ » : on lui
 # signale que ces deux-là sont des fonctions du projet, pas des tests.
@@ -93,6 +94,20 @@ def test_var_glissante_ne_regarde_pas_le_futur(rendements, methode):
     bt2 = var_glissante(modifie, 0.99, 250, methode)
     assert bt1["VaR"].iloc[-1] == pytest.approx(bt2["VaR"].iloc[-1])
     assert bt2["Exception"].iloc[-1]                  # -50 % est bien une exception
+
+
+@pytest.mark.parametrize("methode, calcul_direct", [
+    ("historique", lambda passe: var_historique(passe, 0.99)["VaR"]),
+    ("normale", lambda passe: var_parametrique(passe, 0.99, "normale")["VaR"]),
+    ("student", lambda passe: var_parametrique(passe, 0.99, "student", 5)["VaR"]),
+])
+def test_var_glissante_egale_le_calcul_direct(rendements, methode, calcul_direct):
+    # La version rapide (rolling) doit redonner, pour un jour pris au hasard,
+    # la VaR calculée directement sur les 250 jours qui le précèdent.
+    bt = var_glissante(rendements, 0.99, 250, methode)
+    t = 320
+    attendu = calcul_direct(rendements.iloc[t - 250:t])
+    assert bt.loc[rendements.index[t], "VaR"] == pytest.approx(attendu, rel=1e-10)
 
 
 def test_var_glissante_refuse_une_fenetre_trop_longue(rendements):

@@ -1,12 +1,14 @@
 """
-Tests de la préparation des données (data.py). Le téléchargement Yahoo Finance
-n'est pas testé ici : il dépend d'Internet.
+Tests de la préparation des données (data.py). Le vrai téléchargement Yahoo
+Finance dépend d'Internet : on le remplace par une fausse fonction pour tester
+la gestion des pannes.
 """
 
 import numpy as np
 import pandas as pd
 import pytest
 
+import data
 from data import calculer_rendements, normaliser_poids, rendements_portefeuille
 
 
@@ -37,3 +39,39 @@ def test_un_poids_par_action():
     rendements = pd.DataFrame({"A": [0.01], "B": [0.02]})
     with pytest.raises(ValueError):
         rendements_portefeuille(rendements, [1.0])
+
+
+# ---------------------------------------------------------------------------
+# Téléchargement : on remplace Yahoo Finance par une fausse fonction
+# (monkeypatch), pour tester les nouvelles tentatives sans Internet.
+# ---------------------------------------------------------------------------
+def _faux_prix():
+    index = pd.date_range("2024-01-01", periods=3)
+    return pd.concat({"Close": pd.DataFrame({"A": [1.0, 2.0, 3.0], "B": [4.0, 5.0, 6.0]},
+                                            index=index)}, axis=1)
+
+
+def test_nouvel_essai_apres_une_panne(monkeypatch):
+    appels = []
+
+    def yahoo_capricieux(*args, **kwargs):
+        appels.append(1)
+        if len(appels) == 1:
+            raise ConnectionError("trop de requêtes")       # premier appel : échec
+        return _faux_prix()                                  # deuxième appel : succès
+
+    monkeypatch.setattr(data.yf, "download", yahoo_capricieux)
+    monkeypatch.setattr(data, "PAUSE", 0)
+    prix = data.telecharger_prix(["A", "B"], "2024-01-01")
+    assert len(appels) == 2
+    assert prix["B"].tolist() == [4.0, 5.0, 6.0]
+
+
+def test_message_clair_si_yahoo_ne_repond_pas(monkeypatch):
+    def yahoo_en_panne(*args, **kwargs):
+        raise ConnectionError("service indisponible")
+
+    monkeypatch.setattr(data.yf, "download", yahoo_en_panne)
+    monkeypatch.setattr(data, "PAUSE", 0)
+    with pytest.raises(ValueError, match="Yahoo Finance ne répond pas"):
+        data.telecharger_prix(["A"], "2024-01-01")

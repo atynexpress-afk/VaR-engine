@@ -13,10 +13,12 @@ Projet réalisé dans le cadre du Master 2 Ingénierie des risques économiques 
 - **Portefeuille paramétrable** : actions du CAC 40 ou tout ticker Yahoo Finance, poids rééquilibrés automatiquement, période et montant au choix.
 - **Six méthodes de VaR et d'ES** : historique, paramétrique (loi normale et loi de Student), Monte Carlo avec corrélations, EWMA (RiskMetrics) et historique filtrée (FHS).
 - **Tous les paramètres modifiables** : niveau de confiance, horizon, degrés de liberté, nombre de simulations, graine aléatoire, facteur de lissage λ, fenêtre d'estimation.
-- **Backtesting** : VaR glissante hors échantillon, tests de Kupiec et de Christoffersen, feux tricolores de Bâle.
+- **Backtesting** : VaR glissante hors échantillon, tests de Kupiec et de Christoffersen, feux tricolores de Bâle, et conclusion en langage clair (quel modèle passe les tests, et pourquoi les autres échouent).
 - **Stress tests** : crises historiques (Lehman 2008, dette européenne 2011, Covid 2020, Ukraine 2022) et chocs hypothétiques définis par l'utilisateur.
 - **Diagnostic des queues de distribution** : histogramme comparé à la loi normale, QQ-plot, skewness et kurtosis.
 - **Graphiques interactifs** et définition de chaque notion accessible depuis l'interface.
+- **Export Excel** des résultats : paramètres, VaR et ES, backtesting et stress tests, une feuille par thème.
+- **Guide de démarrage** pour les utilisateurs qui découvrent la finance.
 
 ## Méthodologie
 
@@ -48,6 +50,7 @@ var-engine/
 ├── app.py              Interface Streamlit : barre latérale, calculs, en-tête
 ├── onglets.py          Contenu des quatre onglets (une fonction par onglet)
 ├── formats.py          Mise en forme des nombres à la française
+├── export.py           Export des résultats en Excel
 ├── data.py             Téléchargement des prix, rendements, portefeuille
 ├── var_models.py       VaR et ES : historique, paramétrique, Monte Carlo, EWMA, FHS
 ├── backtesting.py      Kupiec, Christoffersen, Bâle, stress tests
@@ -74,14 +77,16 @@ streamlit run app.py
 
 ## Tests
 
-Le moteur de calcul est couvert par 37 tests automatiques, sur données simulées (sans connexion Internet) :
+Le moteur de calcul est couvert par 43 tests automatiques, sur données simulées (sans connexion Internet) :
 
 ```bash
 pip install -r requirements-dev.txt
 python -m pytest
 ```
 
-Ils vérifient notamment les formules fermées de la VaR et de l'ES normales, la convergence du Monte Carlo, la récurrence EWMA, la statistique de Kupiec sur le cas de référence de Jorion (10 exceptions sur 250 jours : LR = 12,96), la détection des grappes d'exceptions par Christoffersen, les bornes des zones de Bâle, et l'absence de regard vers le futur dans le backtesting.
+Ils vérifient notamment les formules fermées de la VaR et de l'ES normales, la convergence du Monte Carlo, la récurrence EWMA, la statistique de Kupiec sur le cas de référence de Jorion (10 exceptions sur 250 jours : LR = 12,96), la détection des grappes d'exceptions par Christoffersen, les bornes des zones de Bâle, l'absence de regard vers le futur dans le backtesting, l'équivalence entre le backtesting vectorisé et le calcul direct, la reprise après une panne de Yahoo Finance et l'export Excel.
+
+Le backtesting est vectorisé avec les fenêtres glissantes de pandas (`rolling`) : 259 fois plus rapide qu'une boucle jour par jour, pour des résultats identiques.
 
 ## Limites connues
 
