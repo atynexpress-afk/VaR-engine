@@ -45,7 +45,9 @@ Projet réalisé dans le cadre du Master 2 Ingénierie des risques économiques 
 
 ```
 var-engine/
-├── app.py              Interface Streamlit
+├── app.py              Interface Streamlit : barre latérale, calculs, en-tête
+├── onglets.py          Contenu des quatre onglets (une fonction par onglet)
+├── formats.py          Mise en forme des nombres à la française
 ├── data.py             Téléchargement des prix, rendements, portefeuille
 ├── var_models.py       VaR et ES : historique, paramétrique, Monte Carlo, EWMA, FHS
 ├── backtesting.py      Kupiec, Christoffersen, Bâle, stress tests
